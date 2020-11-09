@@ -1,0 +1,30 @@
+{
+   "name": "windsensor-service",
+   "version": "0.2.0",
+   "description": "server part of the windsensor",
+   "private": true,
+   "author": {
+      "name": "Thomas Ederer",
+      "email": "thomas@neusiedl.coderdojo.net"
+   },
+   "licenses": [
+      {
+         "type": "BSD-3-Clause"
+      }
+   ],
+   "dependencies": {
+      "express": "4.x",
+      "body-parser": "1.x"
+   },
+   "devDependencies": {
+      "grunt": "1.x",
+      "mocha": "7.x",
+      "expect.js": "0.x",
+      "grunt-contrib-clean": "1.x",
+      "grunt-contrib-jshint": "1.x",
+      "grunt-mocha-test": "0.x"
+   },
+   "engines": {
+      "node": ">=12.16.2"
+   }
+}
