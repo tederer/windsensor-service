@@ -100,7 +100,7 @@ To build the Docker image execute `buildDockerImage.sh`.
 
 For a successful execution of the service you need to set the environment variable `SENSOR_ID`. The following command starts the service for the sensor 11223. The HTTP interface is available on port 80.
 
-    sudo docker run -it --rm --env SENSOR_ID=11223 -p 80:80 tederer/windsensor
+    sudo docker run -it --rm --env SENSOR_ID=11223 -p 80:80 tederer/windsensor-service
 
 The table below describes all supported environment variables.
 
