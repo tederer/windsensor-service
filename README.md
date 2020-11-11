@@ -113,3 +113,6 @@ The table below describes all supported environment variables.
 ## executing the tests
 
 To execute the tests, run the script `startNodeJsContainer.sh`. It starts a Docker container containing Node.js. The current folder (containing `startNodeJsContainer.sh`) gets mounted into the container. You can run the linter and the tests by calling `runGrunt.sh`.
+
+## references
+[windsensor-frontend](https://github.com/tederer/windsensor-frontend)
