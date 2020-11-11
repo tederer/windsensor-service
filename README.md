@@ -1,11 +1,19 @@
 # windsensor-service
 
-This test driven developed service consumes the raw sensor values (wind direction and speed) provided via HTTP PUT requests and calculates ...
+This test driven developed service is part of the following design.
+
+![overall design](overall-design.svg)
+
+It is responsible to consumes the raw sensor values (wind direction and speed) provided by the windsensor hardware (via HTTP PUT requests) and calculates ...
 
 * one minute average
 * ten minute average
 
 Both averages contain a trend describing the way the wind speed changed within the averaging period.
+
+## service architecture
+
+The following diagram describes the internal architecture of the service.
 
 ![Design](design.svg)
 
