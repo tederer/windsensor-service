@@ -18,11 +18,15 @@ if (configuredlogLevel !== undefined && windsensor.logging.Level[configuredlogLe
 windsensor.logging.LoggingSystem.setMinLogLevel(logLevel);
 LOGGER.logInfo('log level = ' + logLevel.description);
 
-var version = windsensor.getVersion();
-if (typeof version === 'string') {
-    LOGGER.logInfo('version = ' + version);
+var info = {
+    version:    windsensor.getVersion(),
+    start:      (new Date()).toISOString()
+};
+
+if (typeof info.version === 'string') {
+    LOGGER.logInfo('version = ' + info.version);
 } else {
-    LOGGER.logError('failed to evaluate version: ' + version.message);
+    LOGGER.logError('failed to evaluate version: ' + info.version.message);
 }
 
 var assertValidSensorId = function assertValidSensorId() {
@@ -95,6 +99,12 @@ app.get(/\/windsensor\/\d+/, (request, response) => {
     } else {
         response.status(400).send('invalid request');
     }
+});
+
+app.get(/\/info/, (request, response) => {
+    var path = request.path;
+    LOGGER.logDebug('GET request [path: ' + path + ']');
+    response.status(200).json(info);
 });
 
 app.listen(port, () => {
