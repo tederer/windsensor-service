@@ -20,7 +20,7 @@ The following diagram describes the internal architecture of the service.
 
 ## Input message format
 
-The sensor hardware evaluates the wind speed (pulses of the anemometer) and direction (heading of the vane) every second and stored them for later delivery to this service. To send the stored data to the service, a HTTP PUT request to `/windsensor/<id>` gets used. The payload of the request contains a JSON object of the following format (the following examples delivers data of the past 5 seconds):
+The sensor hardware evaluates the wind speed (pulses of the anemometer) and direction (heading of the vane) every second and stored them for later delivery to this service. To send the stored data to the service, a HTTP POST request to `/windsensor/<id>` gets used. The payload of the request contains a JSON object of the following format (the following examples delivers data of the past 5 seconds):
 
     {
         version:"1.0.0",
@@ -116,7 +116,7 @@ To execute the tests, run the script `startNodeJsContainer.sh`. It starts a Dock
 
 ## polling container informations
 
-To get the version and the start time of the container, insert the IP address and the port of your container into the following URL and open it in a browser.
+To get the version, start time and log level of the container, insert the IP address and the port of your container into the following URL and open it in a browser.
 
     https://<ip-address-of-container>:<port-of-container>/info
 
