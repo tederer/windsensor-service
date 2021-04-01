@@ -68,8 +68,8 @@ windsensor.averaging.Averager = function Averager(database, durationInMillis, op
         this.get = function get() {
             var averageSpeed = 0;
             var averageDuration = 0;
-            var quotientDividend = 0;
-            var quotientDivisor = 0;
+            var gradientDividend = 0;
+            var gradientDivisor = 0;
             
             speedValues.forEach(value => {
                 averageSpeed += value.speed;
@@ -81,14 +81,14 @@ windsensor.averaging.Averager = function Averager(database, durationInMillis, op
             speedValues.forEach(value => {
                 var speedDiff     = value.speed - averageSpeed;
                 var durationDiff  = value.duration - averageDuration;
-                quotientDividend += speedDiff * durationDiff;
-                quotientDivisor  += Math.pow(durationDiff, 2);
+                gradientDividend += speedDiff * durationDiff;
+                gradientDivisor  += Math.pow(durationDiff, 2);
             });
             
-            var quotient = quotientDividend / quotientDivisor;
-            var offset = averageSpeed - (quotient * averageDuration);
+            var gradient = gradientDividend / gradientDivisor;
+            var offset = averageSpeed - (gradient * averageDuration);
 
-            return {offset: offset, quotient: quotient * durationInMillis};
+            return {offset: offset, gradient: gradient * durationInMillis};
         };
     };
     
@@ -104,7 +104,7 @@ windsensor.averaging.Averager = function Averager(database, durationInMillis, op
                     minimum:3.4,
                     max:12.9,
                     linearTrend:{
-                        quotient: 2.4,		
+                        gradient: 2.4,		
                         offset: 13.2
                     }
                 }
@@ -113,16 +113,18 @@ windsensor.averaging.Averager = function Averager(database, durationInMillis, op
      * Units: 
      * 	direction values        degrees
      * 	speed values            km/h
-     * 	linear trend quotient   km/h per averaging duration
+     * 	linear trend gradient   km/h per averaging duration
      * 	linear trend offset     km/h
      * 
      * The direction average will be undefined if the length of the vector sum is below 0.5 km/h.
      * The speed values will be undefined if the database does not contain any processable sensor data. 
      * 
-     * The linear trend describes a linear function "f(x) = offset + x * quotient" that describes the tendency 
-     * of the measured wind speeds in the averaging duration. The higher the quotient the stronger the wind 
-     * speed increases (positive quotient values) or decreases (negative quotient values). A quotient close 
-     * to zero indicates constant wind speeds.
+     * The linear speed trend is the best possible straight line that can be laid through this data. 
+     * Such a line is described by two values, the gradient and the vertical offset. Mathematically 
+     * speaking it would be "f(t) = offset + t * gradient" - t stands for the time passed since the 
+     * first sample in the averaging period was received.
+     * 
+     * For details please have a look at linear_trend.jpg or https://www.crashkurs-statistik.de/einfache-lineare-regression/.
      */
     this.calculateAverage = function calculateAverage() {
         var directionAverage = new DirectionAverage();

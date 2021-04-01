@@ -46,7 +46,7 @@ var offset = function offset(value) {
    return value;
 };
 
-var quotient = function quotient(value) {
+var gradient = function gradient(value) {
    return value;
 };
 
@@ -180,9 +180,9 @@ var round = function round(value) {
    return Math.round(value * factor) / factor;
 };
 
-var thenTheSpeedTrendShouldBe = function thenTheSpeedTrendShouldBe(expectedOffset, expectedQuotient) {
-   var actual = {offset: round(calculationResult.speed.trend.offset), quotient: round(calculationResult.speed.trend.quotient)};
-   var expected = {offset: round(expectedOffset), quotient: round(expectedQuotient)};
+var thenTheSpeedTrendShouldBe = function thenTheSpeedTrendShouldBe(expectedOffset, expectedgradient) {
+   var actual = {offset: round(calculationResult.speed.trend.offset), gradient: round(calculationResult.speed.trend.gradient)};
+   var expected = {offset: round(expectedOffset), gradient: round(expectedgradient)};
    expect(actual).to.be.eql(expected);
 };
 
@@ -401,7 +401,7 @@ describe('Averager', function() {
       var record2 = record().withTimestamp(second(60)).withAnemometerPulses([1]).build();
       givenDatabaseProvidesRecords([record1, record2]);
       whenAverageCalculationGetsTriggered();
-      thenTheSpeedTrendShouldBe(offset(kmh(10)), quotient(kmh(5)));
+      thenTheSpeedTrendShouldBe(offset(kmh(10)), gradient(kmh(5)));
    });
    
    it('speed trend calculation - B', function() {
@@ -412,7 +412,7 @@ describe('Averager', function() {
       var record3 = record().withTimestamp(second(10 * 60)).withAnemometerPulses([2]).build();
       givenDatabaseProvidesRecords([record1, record2, record3]);
       whenAverageCalculationGetsTriggered();
-      thenTheSpeedTrendShouldBe(offset(kmh(7)), quotient(kmh(-4)));
+      thenTheSpeedTrendShouldBe(offset(kmh(7)), gradient(kmh(-4)));
    });
 
    it('speed trend calculation - C', function() {
@@ -422,7 +422,7 @@ describe('Averager', function() {
       var record2 = record().withTimestamp(second(60)).withAnemometerPulses([2]).build();
       givenDatabaseProvidesRecords([record1, record2]);
       whenAverageCalculationGetsTriggered();
-      thenTheSpeedTrendShouldBe(offset(kmh(2.4834744605)), quotient(kmh(1.4995902759)));
+      thenTheSpeedTrendShouldBe(offset(kmh(2.4834744605)), gradient(kmh(1.4995902759)));
    });
 
    it('combined test', function() {

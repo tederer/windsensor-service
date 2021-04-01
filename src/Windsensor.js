@@ -91,7 +91,7 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionalAve
     *             minimum: 12.1,                      unit: km/h
     *             maximum: 30.9,                      unit: km/h
     *				   linearTrend:{
-    *                quotient: 2.4,		               unit: km/h
+    *                gradient: 2.4,		               unit: km/h
     *                offset: 13.2                     unit: km/h
     *             }
     *          }, 
@@ -104,17 +104,18 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionalAve
     *             minimum: 11.9,                      unit: km/h
     *             maximum: 35.9,                      unit: km/h
     *				   linearTrend:{
-    *                quotient: 0.3,		               unit: km/h
+    *                gradient: 0.3,		               unit: km/h
     *                offset: 25.1                     unit: km/h
     *             }
     *          }
     *    }
     *
-    * The linear speed trend describes a linear function "f(x) = offset + x * quotient" that describes the 
-    * tendency of the measured wind speeds in the averaging duration. The higher the quotient the stronger 
-    * the wind speed increased (positive quotient values) or decreased (negative quotient values). A quotient 
-    * close to zero indicates constant wind speeds.
+    * The linear speed trend is the best possible straight line that can be laid through this data. 
+    * Such a line is described by two values, the gradient and the vertical offset. Mathematically 
+    * speaking it would be "f(t) = offset + t * gradient" - t stands for the time passed since the 
+    * first sample in the averaging period was received.
     * 
+    * For details please have a look at linear_trend.jpg or https://www.crashkurs-statistik.de/einfache-lineare-regression/.
     * Errors: 'undefined' gets return if the sensorId is not correct.
     */
    this.getAverages = function getAverages() {
