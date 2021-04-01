@@ -53,7 +53,7 @@ The calculated average values can be polled by using a HTTP GET request to `/win
                 minimum: 12.1,
                 maximum: 30.9,
                 linearTrend: {
-                    quotient: 2.4,
+                    gradient: 2.4,
                     offset: 13.2
                 }
             }, 
@@ -66,7 +66,7 @@ The calculated average values can be polled by using a HTTP GET request to `/win
                 minimum: 11.9,
                 maximum: 35.9,
                 linearTrend: {
-                    quotient: 0.3,
+                    gradient: 0.3,
                     offset: 25.1
                 }
             }
@@ -90,7 +90,18 @@ The calculated average values can be polled by using a HTTP GET request to `/win
 |speed.maximum|float|0 <= maxmimum|km/h|The maximum wind speed.|
 
 
-The linear speed trend is a linear function "f(x) = offset + x * quotient" that describes the tendency of the measured wind speeds in the averaging duration (in km/h). The higher the quotient the stronger the wind speed increased (positive quotient values) or decreased (negative quotient values). A quotient close to zero indicates constant wind speeds.
+### Linear speed trend
+
+The linear speed trend is the best possible straight line that can be laid through this data. Such a line is described by two values, the gradient and the vertical offset. Mathematically speaking it would be "f(t) = offset + t * gradient" - t stands for the time passed since the first sample in the averaging period was received.
+
+|property|type|range|unit|description|
+|--------|----|-----|----|-----------|
+|linearTrend.gradient|float||km/h per averaging duration|The difference of the right most and left most linear trend value.|
+|linearTrend.offset|float||km/h|The vertical offset of the linear function|
+
+The higher the gradient the stronger the wind speed increased (positive gradient values) or decreased (negative gradient values). A gradient close to zero indicates constant wind speeds.
+
+![Design](linear_trend_example.svg)
 
 ## building the Docker image
 

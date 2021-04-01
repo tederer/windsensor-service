@@ -56,7 +56,6 @@ windsensor.averaging.Averager = function Averager(database, durationInMillis, op
 
     var SpeedTrend = function SpeedTrend() {
         var speedValues = [];
-        var millisPassedSinceStart = 0;
         var startTimestamp;
 
         this.add = function add(speed, timestamp) {
@@ -80,8 +79,8 @@ windsensor.averaging.Averager = function Averager(database, durationInMillis, op
             averageDuration = averageDuration / speedValues.length;
 
             speedValues.forEach(value => {
-                var speedDiff = (value.speed - averageSpeed);
-                var durationDiff = (value.duration - averageDuration);
+                var speedDiff     = value.speed - averageSpeed;
+                var durationDiff  = value.duration - averageDuration;
                 quotientDividend += speedDiff * durationDiff;
                 quotientDivisor  += Math.pow(durationDiff, 2);
             });
@@ -112,10 +111,10 @@ windsensor.averaging.Averager = function Averager(database, durationInMillis, op
             }
      * 
      * Units: 
-     * 	direction values 			degrees
-     * 	speed values 				km/h
-     * 	linear trend quotient	km/h per averaging duration
-     * 	linear trend offset		km/h
+     * 	direction values        degrees
+     * 	speed values            km/h
+     * 	linear trend quotient   km/h per averaging duration
+     * 	linear trend offset     km/h
      * 
      * The direction average will be undefined if the length of the vector sum is below 0.5 km/h.
      * The speed values will be undefined if the database does not contain any processable sensor data. 
