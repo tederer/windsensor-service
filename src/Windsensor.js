@@ -104,7 +104,7 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionalAve
     *             minimum: 11.9,                      unit: km/h
     *             maximum: 35.9,                      unit: km/h
     *				   linearTrend:{
-    *                gradient: 0.3,		               unit: km/h
+    *                gradient: 0.3,		               unit: km/h per averaging duration
     *                offset: 25.1                     unit: km/h
     *             }
     *          }
