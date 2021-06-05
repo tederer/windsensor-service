@@ -102,13 +102,13 @@ windsensor.averaging.Averager = function Averager(database, durationInMillis, op
      * 		speed:{
                     average:10.7,
                     minimum:3.4,
-                    max:12.9,
+                    maximum:12.9,
                     linearTrend:{
                         gradient: 2.4,		
                         offset: 13.2
-                    }
-                }
+                    }    
             }
+        }
      * 
      * Units: 
      * 	direction values        degrees

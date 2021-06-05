@@ -109,6 +109,17 @@ app.get(/\/windsensor\/\d+/, (request, response) => {
     }
 });
 
+app.get(/\/windsensor\/history\/\d+/, (request, response) => {
+    var path = request.path;
+    LOGGER.logDebug('GET request [path: ' + path + ']');
+
+    if (sensorIdInRequestPathIsCorrect(path)) {
+        response.status(200).json({twoHoursHistory: sensor.getDataOfLast2Hours()});
+    } else {
+        response.status(400).send('invalid request');
+    }
+});
+
 app.get(/\/info/, (request, response) => {
     var path = request.path;
     LOGGER.logDebug('GET request [path: ' + path + ']');

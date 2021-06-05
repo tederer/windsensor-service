@@ -27,13 +27,57 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionalAve
    var averagerFactory = (optionalAveragerFactory === undefined) ? windsensor.averaging.Factory : optionalAveragerFactory;
    var timestampFactory = (optionalTimestampFactory === undefined) ? defaultTimestampFactory : optionalTimestampFactory;
 
+   var TwoHourHistory = function TwoHourHistory() {
+      var dataOfLast2Hours = [];
+
+      var createDataForHistory = function createDataForHistory(timestamp, tenMinAverage) {
+         var data = {timestamp: timestamp};
+   
+         if (tenMinAverage.direction !== undefined) {
+            data.averageDirection = tenMinAverage.direction.average;
+         }
+            
+         if (tenMinAverage.speed !== undefined) {
+            data.averageSpeed = tenMinAverage.speed.average;
+            data.minimumSpeed = tenMinAverage.speed.minimum;
+            data.maximumSpeed = tenMinAverage.speed.maximum;
+         }
+   
+         return data;      
+      };
+   
+      var removeDataOlderThan2Hours = function removeDataOlderThan2Hours(nowAsIsoString) {
+         var twoHoursInMillis = 2 * 60 * 60 * 1000;
+         var nowInMillis = Date.parse(nowAsIsoString);
+         if (!isNaN(nowInMillis)) {
+            dataOfLast2Hours = dataOfLast2Hours.filter(data => {
+               var ageInMillis = nowInMillis - Date.parse(data.timestamp);
+               return ageInMillis <= twoHoursInMillis;
+            });
+         }
+      };
+      
+      this.add = function add(nowAsIsoString, tenMinAverage) {
+         dataOfLast2Hours.push(createDataForHistory(nowAsIsoString, tenMinAverage));
+         removeDataOlderThan2Hours(nowAsIsoString);
+      };
+
+      this.get = function get() {
+         var nowAsIsoString = timestampFactory();
+         removeDataOlderThan2Hours(nowAsIsoString);
+         return dataOfLast2Hours;
+      };
+   };
+
+   var historyOf2Hours = new TwoHourHistory();
+
    var lastSequenceId;
    
    var oneMinAverager = averagerFactory.create1minAverager(database);
    var tenMinAverager = averagerFactory.create10minAverager(database);
    
    var averages = { version: MESSAGE_VERSION };
-
+   
    var isNewSequenceId = function isNewSequenceId(id) {
       return lastSequenceId === undefined || lastSequenceId !== id;
    };
@@ -60,14 +104,15 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionalAve
       if (isNewSequenceId(message.sequenceId) ) {
          LOGGER.logInfo(() => 'process message: ' + JSON.stringify(message));
          lastSequenceId = message.sequenceId;
-         var timestamp = timestampFactory();
+         var nowAsIsoString = timestampFactory();
          database.insert(message);
          database.removeAllDocumentsOlderThan(TEN_MINUTES);
          var oneMinAverage = calculateAverage(oneMinAverager);
          var tenMinAverage = calculateAverage(tenMinAverager);
-         averages.timestamp = timestamp;
+         averages.timestamp = nowAsIsoString;
          averages.oneMinute = oneMinAverage;
          averages.tenMinutes = tenMinAverage;
+         historyOf2Hours.add(nowAsIsoString, tenMinAverage);
          LOGGER.logInfo(() => 'current averages (including direction correction): ' + JSON.stringify(averages));
       } else {
          LOGGER.logWarning(() => 'ignoring message because sequence ID is not a new one in the following message: ' + JSON.stringify(message));
@@ -121,5 +166,17 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionalAve
    this.getAverages = function getAverages() {
       LOGGER.logDebug(() => 'get averages');
       return averages;
+   };
+
+   /*
+    * getDataOfLast2Hours returns the 10 minute average values of the last 2 hours.
+    *
+    *   {
+    *       version:   '1.0.0',
+    *       data: [{timestamp: '2020-09-21T11:53:40.560Z', averageDirection: 127.4, averageSpeed: 14.2, minimumSpeed: 7.9, maximumSpeed: 23.8}, ...]
+    *   }          
+    */
+   this.getDataOfLast2Hours = function getDataOfLast2Hours() {
+      return {version: '1.0.0', data: historyOf2Hours.get()};
    };
 };

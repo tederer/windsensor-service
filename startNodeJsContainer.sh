@@ -12,4 +12,4 @@ fi
 
 echo "The content of $scriptDir is available in $destination"
 
-sudo docker run -it --rm --volume=$scriptDir:/root/$projectName:rw  node:current-slim /bin/bash
+sudo docker run -it --rm --volume=$scriptDir:/root/$projectName:rw -p=8080:80 node:current-slim /bin/bash

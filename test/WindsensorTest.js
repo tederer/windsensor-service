@@ -20,6 +20,7 @@ var testing10minAverager;
 var testingTimestampFactory;
 var lastMessageProvidedForProcessing;
 var averages;
+var dataOfLast2Hours;
 var timestamps;
 var timestampIndex;
 var mockedAverageInstanceId = 1;
@@ -46,13 +47,14 @@ var TestingAverager = function TestingAverager(database) {
 
    this.setReturnValues = function setReturnValues(values) {
       returnValues = values;
+      returnValuesIndex = 0;
    };
 };
 
 var createMockedAverage = function createMockedAverage() {
    var mock = {
       direction: {
-         average: mockedAverageInstanceId,
+         average: (mockedAverageInstanceId * 10) % 360,
       },
       
       speed: {
@@ -72,7 +74,7 @@ var givenAWindsensor = function givenAWindsensor(optionalId) {
 
 var givenAWindsensorWithADirection = function givenAWindsensorWithADirection(directionToUse) {
    direction = directionToUse;
-   givenAWindsensor(SENSOR_ID);
+   givenAWindsensor();
 };
 
 var givenMessageGetsProcessed = function givenMessageGetsProcessed(message, optionalId) {
@@ -81,44 +83,48 @@ var givenMessageGetsProcessed = function givenMessageGetsProcessed(message, opti
 };
 
 var givenOneMinuteAveragerReturns = function givenOneMinuteAveragerReturns(returnValue) {
-   testing1minAverager.setReturnValues([returnValue]);
+   testing1minAverager.setReturnValues(returnValue);
 };
 
 var givenOneMinuteAveragerReturnsAverageDirection = function givenOneMinuteAveragerReturnsAverageDirection(direction) {
    var anySpeedValue = {average: 5, minimum: 2, maximum: 6};
    var value = {direction: {average: direction}, speed: anySpeedValue};
-   givenOneMinuteAveragerReturns(value);
+   givenOneMinuteAveragerReturns([value]);
 };
 
 var givenTenMinuteAveragerReturns = function givenTenMinuteAveragerReturns(returnValue) {
-   testing10minAverager.setReturnValues([returnValue]);
+   testing10minAverager.setReturnValues(returnValue);
 };
 
 var givenTenMinuteAveragerReturnsAverageDirection = function givenTenMinuteAveragerReturnsAverageDirection(direction) {
    var anySpeedValue = {average: 5, minimum: 2, maximum: 6};
    var value = {direction: {average: direction}, speed: anySpeedValue};
-   givenTenMinuteAveragerReturns(value);
+   givenTenMinuteAveragerReturns([value]);
 };
 
 var givenTimestampFactoryReturns = function givenTimestampFactoryReturns(timestampToReturn) {
    timestamps = [timestampToReturn];
+   timestampIndex = 0;
 };
 
 var whenSameMessageGetsProcessedAgain = function whenSameMessageGetsProcessedAgain() {
    givenMessageGetsProcessed(lastMessageProvidedForProcessing, SENSOR_ID);
 };
 
-var whenAWindsensorGetsCreated = function whenAWindsensorGetsCreated(optionalId) {
-   givenAWindsensor(optionalId);
+var whenAWindsensorGetsCreated = function whenAWindsensorGetsCreated() {
+   givenAWindsensor();
 };
 
 var whenMessageGetsProcessed = function whenMessageGetsProcessed(message, id) {
    givenMessageGetsProcessed(message, id);
 };
 
-var whenAveragesGetRequested = function whenAveragesGetRequested(optionalId) {
-   var id = (optionalId === undefined) ? SENSOR_ID : optionalId;
-   averages = sensor.getAverages(id);
+var whenAveragesGetRequested = function whenAveragesGetRequested() {
+    averages = sensor.getAverages();
+};
+
+var whenDataOfLast2HoursGetRequested = function whenDataOfLast2HoursGetRequested() {
+   dataOfLast2Hours = sensor.getDataOfLast2Hours();
 };
 
 var thenNothingShouldGetInsertedIntoDatabase = function thenNothingShouldGetInsertedIntoDatabase() {
@@ -204,11 +210,35 @@ var thenAveragesVersionShouldBe = function thenAveragesVersionShouldBe(expectedV
    expect(averages.version).to.be.eql(expectedVersion);
 };
 
+var thenVersionOfDataOfLast2HoursShouldBe = function thenVersionOfDataOfLast2HoursShouldBe(expectedVersion) {
+   expect(dataOfLast2Hours.version).to.be.eql(expectedVersion);
+};
+
+var thenDataOfLast2HoursShouldContainDataSamples = function thenDataOfLast2HoursShouldContainDataSamples(expectedSampleCount) {
+   expect(dataOfLast2Hours.data.length).to.be.eql(expectedSampleCount);
+};
+
+var toExpectedFormat = function toExpectedFormat(data) {
+   return {
+      timestamp:        data.timestamp, 
+      averageDirection: data.average.direction.average, 
+      averageSpeed:     data.average.speed.average, 
+      minimumSpeed:     data.average.speed.minimum, 
+      maximumSpeed:     data.average.speed.maximum
+   };
+};
+
+var thenDataOfLast2HoursShouldContain = function thenDataOfLast2HoursShouldContain(expectedData) {
+   expect(dataOfLast2Hours.data.length).to.be.eql(expectedData.length);
+   expect(dataOfLast2Hours.data).to.be.eql(expectedData.map(toExpectedFormat));
+};
+
 var setup = function setup() {
    sensorId = '';
    direction = 0;
    lastMessageProvidedForProcessing = undefined;
    averages = undefined;
+   dataOfLast2Hours = undefined;
    timestamps = [];
    timestampIndex = 0;
    
@@ -325,8 +355,8 @@ describe('Windsensor', function() {
       var averageA = createMockedAverage();
       var averageB = createMockedAverage();
       givenAWindsensor();
-      givenOneMinuteAveragerReturns(averageA);
-      givenTenMinuteAveragerReturns(averageB);
+      givenOneMinuteAveragerReturns([averageA]);
+      givenTenMinuteAveragerReturns([averageB]);
       givenMessageGetsProcessed(ANY_MESSAGE);
       whenAveragesGetRequested();
       thenAveragesShouldBe(averageA, averageB);
@@ -334,8 +364,8 @@ describe('Windsensor', function() {
 
    it('getAverages() result contains the values provided by the averagers - B', function() {
       givenAWindsensor();
-      givenOneMinuteAveragerReturns(UNDEFINED_AVERAGER_RESULT);
-      givenTenMinuteAveragerReturns(UNDEFINED_AVERAGER_RESULT);
+      givenOneMinuteAveragerReturns([UNDEFINED_AVERAGER_RESULT]);
+      givenTenMinuteAveragerReturns([UNDEFINED_AVERAGER_RESULT]);
       givenMessageGetsProcessed(ANY_MESSAGE);
       whenAveragesGetRequested();
       thenAveragesShouldBe(UNDEFINED_AVERAGER_RESULT, UNDEFINED_AVERAGER_RESULT);
@@ -379,4 +409,58 @@ describe('Windsensor', function() {
       whenAveragesGetRequested();
       thenAveragesVersionShouldBe('1.0.0');
    });
+
+   it('getDataOfLast2Hours() returns the 10 minute average values for the last 2 hours', function() {
+      givenAWindsensorWithADirection(degrees(0));
+      givenTimestampFactoryReturns('2021-06-05T11:53:40.100Z');
+      givenTenMinuteAveragerReturnsAverageDirection(degrees(50.0));
+      givenMessageGetsProcessed(ANY_MESSAGE);
+      whenDataOfLast2HoursGetRequested();
+      thenDataOfLast2HoursShouldContainDataSamples(1);
+   });
+
+   it('getDataOfLast2Hours() does not return data older than 2 hours', function() {
+     
+      var tuples = [ {timestamp: '2021-06-05T11:53:40.100Z', average: createMockedAverage()},
+                     {timestamp: '2021-06-05T13:53:40.100Z', average: createMockedAverage()},
+                     {timestamp: '2021-06-05T13:53:40.101Z', average: createMockedAverage()}];
+
+      givenAWindsensorWithADirection(degrees(0));
+      givenTenMinuteAveragerReturns(tuples.map(tuple => tuple.average));
+      for(var i = 0; i < 3; i++) {
+         givenTimestampFactoryReturns(tuples[i].timestamp);
+         givenMessageGetsProcessed(ANY_MESSAGE);
+         ANY_MESSAGE.sequenceId++;
+      }
+      whenDataOfLast2HoursGetRequested();
+      thenDataOfLast2HoursShouldContain([tuples[1], tuples[2]]);
+   });
+
+   it('getDataOfLast2Hours() removes expired data', function() {
+     
+      var tuples = [ {timestamp: '2021-06-05T11:53:40.100Z', average: createMockedAverage()},
+                     {timestamp: '2021-06-05T13:53:40.100Z', average: createMockedAverage()},
+                     {timestamp: '2021-06-05T13:53:40.101Z', average: createMockedAverage()}];
+
+      givenAWindsensorWithADirection(degrees(0));
+      givenTenMinuteAveragerReturns(tuples.map(tuple => tuple.average));
+      for(var i = 0; i < 3; i++) {
+         givenTimestampFactoryReturns(tuples[i].timestamp);
+         givenMessageGetsProcessed(ANY_MESSAGE);
+         ANY_MESSAGE.sequenceId++;
+      }
+      givenTimestampFactoryReturns('2021-06-05T15:53:40.101Z');
+      whenDataOfLast2HoursGetRequested();
+      thenDataOfLast2HoursShouldContain([tuples[2]]);
+   });
+
+   it('getDataOfLast2Hours() returns a JSON object with version 1.0.0', function() {
+      givenAWindsensorWithADirection(degrees(0));
+      givenTimestampFactoryReturns('2021-06-05T11:53:40.100Z');
+      givenTenMinuteAveragerReturnsAverageDirection(degrees(50.0));
+      givenMessageGetsProcessed(ANY_MESSAGE);
+      whenDataOfLast2HoursGetRequested();
+      thenVersionOfDataOfLast2HoursShouldBe('1.0.0');
+   });
+
 });  
