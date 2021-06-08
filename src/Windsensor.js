@@ -112,7 +112,7 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionalAve
          averages.timestamp = nowAsIsoString;
          averages.oneMinute = oneMinAverage;
          averages.tenMinutes = tenMinAverage;
-         historyOf2Hours.add(nowAsIsoString, tenMinAverage);
+         historyOf2Hours.add(nowAsIsoString, oneMinAverage);
          LOGGER.logInfo(() => 'current averages (including direction correction): ' + JSON.stringify(averages));
       } else {
          LOGGER.logWarning(() => 'ignoring message because sequence ID is not a new one in the following message: ' + JSON.stringify(message));

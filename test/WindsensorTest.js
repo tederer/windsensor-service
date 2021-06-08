@@ -410,10 +410,10 @@ describe('Windsensor', function() {
       thenAveragesVersionShouldBe('1.0.0');
    });
 
-   it('getDataOfLast2Hours() returns the 10 minute average values for the last 2 hours', function() {
+   it('getDataOfLast2Hours() returns the average values for the last 2 hours', function() {
       givenAWindsensorWithADirection(degrees(0));
       givenTimestampFactoryReturns('2021-06-05T11:53:40.100Z');
-      givenTenMinuteAveragerReturnsAverageDirection(degrees(50.0));
+      givenOneMinuteAveragerReturnsAverageDirection(degrees(50.0));
       givenMessageGetsProcessed(ANY_MESSAGE);
       whenDataOfLast2HoursGetRequested();
       thenDataOfLast2HoursShouldContainDataSamples(1);
@@ -426,7 +426,7 @@ describe('Windsensor', function() {
                      {timestamp: '2021-06-05T13:53:40.101Z', average: createMockedAverage()}];
 
       givenAWindsensorWithADirection(degrees(0));
-      givenTenMinuteAveragerReturns(tuples.map(tuple => tuple.average));
+      givenOneMinuteAveragerReturns(tuples.map(tuple => tuple.average));
       for(var i = 0; i < 3; i++) {
          givenTimestampFactoryReturns(tuples[i].timestamp);
          givenMessageGetsProcessed(ANY_MESSAGE);
@@ -443,7 +443,7 @@ describe('Windsensor', function() {
                      {timestamp: '2021-06-05T13:53:40.101Z', average: createMockedAverage()}];
 
       givenAWindsensorWithADirection(degrees(0));
-      givenTenMinuteAveragerReturns(tuples.map(tuple => tuple.average));
+      givenOneMinuteAveragerReturns(tuples.map(tuple => tuple.average));
       for(var i = 0; i < 3; i++) {
          givenTimestampFactoryReturns(tuples[i].timestamp);
          givenMessageGetsProcessed(ANY_MESSAGE);
@@ -457,7 +457,7 @@ describe('Windsensor', function() {
    it('getDataOfLast2Hours() returns a JSON object with version 1.0.0', function() {
       givenAWindsensorWithADirection(degrees(0));
       givenTimestampFactoryReturns('2021-06-05T11:53:40.100Z');
-      givenTenMinuteAveragerReturnsAverageDirection(degrees(50.0));
+      givenOneMinuteAveragerReturnsAverageDirection(degrees(50.0));
       givenMessageGetsProcessed(ANY_MESSAGE);
       whenDataOfLast2HoursGetRequested();
       thenVersionOfDataOfLast2HoursShouldBe('1.0.0');
