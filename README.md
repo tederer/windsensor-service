@@ -117,7 +117,7 @@ The history can be polled by using a HTTP GET request to `/windsensor/history/<i
         "twoHoursHistory":{
              "version":"1.0.0",
              "data":[	
-                 {"timestamp":"2021-06-17T16:50:47.387Z","averageDirection":82.62,  "averageSpeed":9.95,"minimumSpeed":3.62,"maximumSpeed":18.10},
+                 {"timestamp":"2021-06-17T16:50:47.387Z","averageDirection":82.62,"averageSpeed":9.95,"minimumSpeed":3.62,"maximumSpeed":18.10},
                  {"timestamp":"2021-06-17T16:52:01.262Z","averageDirection":95.73,"averageSpeed":15.63,"minimumSpeed":10.86,"maximumSpeed":18.10},
                  {"timestamp":"2021-06-17T16:53:15.424Z","averageDirection":94.60,"averageSpeed":17.56,"minimumSpeed":7.24,"maximumSpeed":21.72},
                  {"timestamp":"2021-06-17T16:54:29.361Z","averageDirection":93.66,"averageSpeed":17.32,"minimumSpeed":7.24,"maximumSpeed":21.72},
