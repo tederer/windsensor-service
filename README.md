@@ -39,6 +39,10 @@ The sensor hardware evaluates the wind speed (pulses of the anemometer) and dire
 
 ## Output message format
 
+The service provides the current average values and a history of two hours.
+
+### Current average values
+
 The calculated average values can be polled by using a HTTP GET request to `/windsensor/<id>`. The response contains a JSON object of the following format:
 
     {
@@ -80,7 +84,7 @@ The calculated average values can be polled by using a HTTP GET request to `/win
 |tenMinute|object||The ten minute average values|
 
 
-### Average value format
+#### Average value format
 
 |property|type|range|unit|description|
 |--------|----|-----|----|-----------|
@@ -90,7 +94,7 @@ The calculated average values can be polled by using a HTTP GET request to `/win
 |speed.maximum|float|0 <= maxmimum|km/h|The maximum wind speed.|
 
 
-### Linear speed trend
+#### Linear speed trend
 
 The linear speed trend is the best possible straight line that can be laid through this data. Such a line is described by two values, the gradient and the vertical offset. Mathematically speaking it would be "f(t) = offset + t * gradient" - t stands for the time passed since the first sample in the averaging period was received.
 
@@ -102,6 +106,31 @@ The linear speed trend is the best possible straight line that can be laid throu
 The higher the gradient the stronger the wind speed increased (positive gradient values) or decreased (negative gradient values). A gradient close to zero indicates constant wind speeds.
 
 ![Design](linear_trend_example.svg)
+
+### 2 hours history
+
+Pleae keep in mind that the current implementation stores the history in memory and not in a database to save money. This results in a loss/reset of the history when the service gets restarted.
+
+The history can be polled by using a HTTP GET request to `/windsensor/history/<id>`. The response contains a JSON object of the following format:
+
+    {
+    	 "twoHoursHistory":{
+    	 	"version":"1.0.0",
+    	 	"data":[	{"timestamp":"2021-06-17T16:50:47.387Z","averageDirection":82.62,"averageSpeed":9.95,"minimumSpeed":3.62,"maximumSpeed":18.10},
+    	 				{"timestamp":"2021-06-17T16:52:01.262Z","averageDirection":95.73,"averageSpeed":15.63,"minimumSpeed":10.86,"maximumSpeed":18.10},
+    	 				{"timestamp":"2021-06-17T16:53:15.424Z","averageDirection":94.60,"averageSpeed":17.56,"minimumSpeed":7.24,"maximumSpeed":21.72},
+    	 				{"timestamp":"2021-06-17T16:54:29.361Z","averageDirection":93.66,"averageSpeed":17.32,"minimumSpeed":7.24,"maximumSpeed":21.72},
+    	 				{"timestamp":"2021-06-17T16:55:43.451Z","averageDirection":84.53,"averageSpeed":13.15,"minimumSpeed":7.24,"maximumSpeed":18.10},
+    	 				{"timestamp":"2021-06-17T16:56:58.099Z","averageDirection":88.02,"averageSpeed":12.79,"minimumSpeed":7.24,"maximumSpeed":18.10},
+    	 				{"timestamp":"2021-06-17T16:58:12.380Z","averageDirection":89.17,"averageSpeed":15.20,"minimumSpeed":10.86,"maximumSpeed":18.10},
+    	 				.
+    	 				.
+    	 				.
+    	 				{"timestamp":"2021-06-17T18:49:17.100Z","averageDirection":82.47,"averageSpeed":6.15,"minimumSpeed":3.62,"maximumSpeed":10.86}]
+    	 }
+    }
+
+All speed values are in km/h.
 
 ## building the Docker image
 
