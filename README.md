@@ -131,7 +131,7 @@ The history can be polled by using a HTTP GET request to `/windsensor/history/<i
         }
     }
 
-All speed values are in km/h.
+All speed values are in km/h, direction values in degrees.
 
 ## building the Docker image
 
