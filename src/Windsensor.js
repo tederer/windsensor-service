@@ -18,6 +18,8 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionalAve
    var MESSAGE_VERSION = '1.0.0';
    var TEN_MINUTES     = 10 * 60 * 1000;
    
+   var capturedInvalidMessages = [];
+
    LOGGER.logInfo('creating windsensor [id = ' + id + ', direction = ' + direction + '°] ...');
 
    var defaultTimestampFactory = function defaultTimestampFactory() {
@@ -30,17 +32,17 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionalAve
    var TwoHourHistory = function TwoHourHistory() {
       var dataOfLast2Hours = [];
 
-      var createDataForHistory = function createDataForHistory(timestamp, tenMinAverage) {
+      var createDataForHistory = function createDataForHistory(timestamp, oneMinAverage) {
          var data = {timestamp: timestamp};
    
-         if (tenMinAverage.direction !== undefined) {
-            data.averageDirection = tenMinAverage.direction.average;
+         if (oneMinAverage.direction !== undefined) {
+            data.averageDirection = oneMinAverage.direction.average;
          }
             
-         if (tenMinAverage.speed !== undefined) {
-            data.averageSpeed = tenMinAverage.speed.average;
-            data.minimumSpeed = tenMinAverage.speed.minimum;
-            data.maximumSpeed = tenMinAverage.speed.maximum;
+         if (oneMinAverage.speed !== undefined) {
+            data.averageSpeed = oneMinAverage.speed.average;
+            data.minimumSpeed = oneMinAverage.speed.minimum;
+            data.maximumSpeed = oneMinAverage.speed.maximum;
          }
    
          return data;      
@@ -57,8 +59,8 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionalAve
          }
       };
       
-      this.add = function add(nowAsIsoString, tenMinAverage) {
-         dataOfLast2Hours.push(createDataForHistory(nowAsIsoString, tenMinAverage));
+      this.add = function add(nowAsIsoString, oneMinAverage) {
+         dataOfLast2Hours.push(createDataForHistory(nowAsIsoString, oneMinAverage));
          removeDataOlderThan2Hours(nowAsIsoString);
       };
 
@@ -95,6 +97,15 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionalAve
       return average;
    };
 
+   var captureMessagesWithInvalidPulses = function captureMessagesWithInvalidPulses(message, nowAsIsoString) {
+      if (message !== undefined && message.anemometerPulses !== undefined && message.anemometerPulses.length > 0) {
+         if (message.anemometerPulses.filter(pulses => pulses > 88).length > 0) { // 88 pulses are 200mph (322 kmh) widht is the maximum
+            capturedInvalidMessages.push({timestamp: nowAsIsoString, message: message, history: historyOf2Hours.get()});
+            capturedInvalidMessages = capturedInvalidMessages.slice(-5);
+         }
+      }
+   };
+
    /**
     * processMessage gets called to provide new sensor data for processing.
     * 
@@ -105,6 +116,7 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionalAve
          LOGGER.logInfo(() => 'process message: ' + JSON.stringify(message));
          lastSequenceId = message.sequenceId;
          var nowAsIsoString = timestampFactory();
+         captureMessagesWithInvalidPulses(message, nowAsIsoString);
          database.insert(message);
          database.removeAllDocumentsOlderThan(TEN_MINUTES);
          var oneMinAverage = calculateAverage(oneMinAverager);
@@ -178,5 +190,10 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionalAve
     */
    this.getDataOfLast2Hours = function getDataOfLast2Hours() {
       return {version: '1.0.0', data: historyOf2Hours.get()};
+   };
+
+   // for debugging only
+   this.getInvalidMessages = function getInvalidMessages() {
+      return capturedInvalidMessages;
    };
 };
