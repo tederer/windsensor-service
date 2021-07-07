@@ -18,7 +18,8 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionalAve
    var MESSAGE_VERSION = '1.0.0';
    var TEN_MINUTES     = 10 * 60 * 1000;
    
-   var capturedInvalidMessages = [];
+   var capturedInvalidMessages   = [];
+   var capturedSensorErrors      = [];
 
    LOGGER.logInfo('creating windsensor [id = ' + id + ', direction = ' + direction + '°] ...');
 
@@ -106,17 +107,27 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionalAve
       }
    };
 
+   var captureSensorErrors = function captureSensorErrors(message, nowAsIsoString) {
+      if (message !== undefined && message.errors !== undefined && message.errors.length > 0) {
+         capturedSensorErrors.push({timestamp: nowAsIsoString, errors: message.errors});
+         capturedSensorErrors = capturedSensorErrors.slice(-5);
+      }
+   };
+
    /**
     * processMessage gets called to provide new sensor data for processing.
     * 
     *  message    Object   e.g. {version:"1.0.0",sequenceId:5,anemometerPulses:[0,0,0,0,0],directionVaneValues:[32,38,35,38,39]} 
     */
-	this.processMessage = function processMessage(message) {
+   this.processMessage = function processMessage(message) {
       if (isNewSequenceId(message.sequenceId) ) {
          LOGGER.logInfo(() => 'process message: ' + JSON.stringify(message));
          lastSequenceId = message.sequenceId;
          var nowAsIsoString = timestampFactory();
+         
          captureMessagesWithInvalidPulses(message, nowAsIsoString);
+         captureSensorErrors(message, nowAsIsoString);
+         
          database.insert(message);
          database.removeAllDocumentsOlderThan(TEN_MINUTES);
          var oneMinAverage = calculateAverage(oneMinAverager);
@@ -195,5 +206,10 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionalAve
    // for debugging only
    this.getInvalidMessages = function getInvalidMessages() {
       return capturedInvalidMessages;
+   };
+
+   // for debugging only
+   this.getSensorErrors = function getSensorErrors() {
+      return capturedSensorErrors;
    };
 };
