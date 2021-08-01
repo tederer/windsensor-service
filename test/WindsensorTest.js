@@ -426,18 +426,6 @@ describe('Windsensor', function() {
       whenDataOfLast2HoursGetRequested();
       thenDataOfLast2HoursShouldContainDataSamples(1);
    });
-   
-   it('anemometer pulses get removed if they differ for at least 5 times the standard deviation', function() {
-      givenAWindsensor();
-      var anemometerPulses    = [7,7,7,7,15,3,3,3,3];
-      var directionVaneValues = [0,1,2,3, 4,5,6,7,8];
-      var message = givenMessage(anemometerPulses, directionVaneValues);
-      whenMessageGetsProcessed(message);
-      var expectedAnemometerPulses    = [7,7,7,7,3,3,3,3];
-      var expectedDirectionVaneValues = [0,1,2,3,5,6,7,8];
-      var expectedMessage = givenMessage(expectedAnemometerPulses, expectedDirectionVaneValues);
-      thenTheMessageShouldHaveBeenInsertedIntoDatabase(expectedMessage);
-   });
 
    it('getDataOfLast2Hours() does not return data older than 2 hours', function() {
      
@@ -483,4 +471,27 @@ describe('Windsensor', function() {
       thenVersionOfDataOfLast2HoursShouldBe('1.0.0');
    });
 
+   it('anemometer pulses get removed if they differ from average for at least 5 times the standard deviation', function() {
+      givenAWindsensor();
+      var anemometerPulses    = [17,17,17,17,45,3,3,3,3];
+      var directionVaneValues = [ 0, 1, 2, 3, 4,5,6,7,8];
+      var message = givenMessage(anemometerPulses, directionVaneValues);
+      whenMessageGetsProcessed(message);
+      var expectedAnemometerPulses    = [17,17,17,17,3,3,3,3];
+      var expectedDirectionVaneValues = [ 0, 1, 2, 3,5,6,7,8];
+      var expectedMessage = givenMessage(expectedAnemometerPulses, expectedDirectionVaneValues);
+      thenTheMessageShouldHaveBeenInsertedIntoDatabase(expectedMessage);
+   });
+
+   it('anemometer pulses get removed if they differ from average for at least 30 pulses if standard deviation is below 30/5', function() {
+      givenAWindsensor();
+      var anemometerPulses    = [15,15,15,15,15,15,45,15,15];
+      var directionVaneValues = [ 0, 1, 2, 3, 4, 5, 6, 7, 8];
+      var message = givenMessage(anemometerPulses, directionVaneValues);
+      whenMessageGetsProcessed(message);
+      var expectedAnemometerPulses    = [15,15,15,15,15,15,15,15];
+      var expectedDirectionVaneValues = [ 0, 1, 2, 3, 4, 5, 7, 8];
+      var expectedMessage = givenMessage(expectedAnemometerPulses, expectedDirectionVaneValues);
+      thenTheMessageShouldHaveBeenInsertedIntoDatabase(expectedMessage);
+   });
 });  

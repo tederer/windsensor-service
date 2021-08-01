@@ -138,7 +138,8 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionalAve
          for (var index = 0; index < message.anemometerPulses.length; index++) {
             var pulsesAverage = calculateAveragePulsesIgnoringIndex(message.anemometerPulses, index);
             var standardDeviationOfPulses = calculateStandardDevationOfPulsesIgnoringIndex(message.anemometerPulses, pulsesAverage, index);
-            if (message.anemometerPulses[index] >= (pulsesAverage + 5 * standardDeviationOfPulses)) {
+            var maxAllowedPulses = pulsesAverage + Math.max(30, 5 * standardDeviationOfPulses);
+            if (message.anemometerPulses[index] >= maxAllowedPulses) {
                indicesToRemove.push(index);
             }
          }
