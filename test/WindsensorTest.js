@@ -77,6 +77,20 @@ var givenAWindsensorWithADirection = function givenAWindsensorWithADirection(dir
    givenAWindsensor();
 };
 
+var EmptyMessage = function emptyMessage() {
+   this.version               = '1.0.0';
+   this.sequenceId            = 4;
+   this.anemometerPulses      = [];
+   this.directionVaneValues   = [];
+};
+
+var givenMessage = function givenMessage(anemometerPulses, directionVaneValues) {
+   var message = new EmptyMessage();
+   message.anemometerPulses      = anemometerPulses;
+   message.directionVaneValues   = directionVaneValues;
+   return message;
+};
+
 var givenMessageGetsProcessed = function givenMessageGetsProcessed(message, optionalId) {
    sensor.processMessage(message);
    lastMessageProvidedForProcessing = message;
@@ -282,7 +296,7 @@ var setup = function setup() {
 };
 
 describe('Windsensor', function() {
-	
+   
    beforeEach(setup);
 
    it('the constructor of the windsensor creates a 1min averager', function() {
@@ -303,12 +317,6 @@ describe('Windsensor', function() {
    it('the constructor of the windsensor provides the database to the 10min averager', function() {
       whenAWindsensorGetsCreated();
       then10minAverageShouldHaveBennCreatedWithDatabase();
-   });
-
-   it('a new message gets inserted into the database', function() {
-      givenAWindsensor();
-      whenMessageGetsProcessed(ANY_MESSAGE);
-      thenTheMessageShouldHaveBeenInsertedIntoDatabase(ANY_MESSAGE);
    });
    
    it('a message with the same sequence ID does not get inserted into the database', function() {
@@ -417,6 +425,18 @@ describe('Windsensor', function() {
       givenMessageGetsProcessed(ANY_MESSAGE);
       whenDataOfLast2HoursGetRequested();
       thenDataOfLast2HoursShouldContainDataSamples(1);
+   });
+   
+   it('anemometer pulses get removed if they differ for at least 5 times the standard deviation', function() {
+      givenAWindsensor();
+      var anemometerPulses    = [7,7,7,7,15,3,3,3,3];
+      var directionVaneValues = [0,1,2,3, 4,5,6,7,8];
+      var message = givenMessage(anemometerPulses, directionVaneValues);
+      whenMessageGetsProcessed(message);
+      var expectedAnemometerPulses    = [7,7,7,7,3,3,3,3];
+      var expectedDirectionVaneValues = [0,1,2,3,5,6,7,8];
+      var expectedMessage = givenMessage(expectedAnemometerPulses, expectedDirectionVaneValues);
+      thenTheMessageShouldHaveBeenInsertedIntoDatabase(expectedMessage);
    });
 
    it('getDataOfLast2Hours() does not return data older than 2 hours', function() {

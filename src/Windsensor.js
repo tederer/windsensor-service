@@ -18,7 +18,7 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionalAve
    var MESSAGE_VERSION = '1.0.0';
    var TEN_MINUTES     = 10 * 60 * 1000;
    
-   var capturedInvalidMessages   = [];
+   var messagesContainingOutliers   = [];
    var capturedSensorErrors      = [];
 
    LOGGER.logInfo('creating windsensor [id = ' + id + ', direction = ' + direction + '°] ...');
@@ -98,11 +98,66 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionalAve
       return average;
    };
 
-   var captureMessagesWithInvalidPulses = function captureMessagesWithInvalidPulses(message, nowAsIsoString) {
-      if (message !== undefined && message.anemometerPulses !== undefined && message.anemometerPulses.length > 0) {
-         if (message.anemometerPulses.filter(pulses => pulses > 88).length > 0) { // 88 pulses are 200mph (322 kmh) widht is the maximum
-            capturedInvalidMessages.push({timestamp: nowAsIsoString, message: message, history: historyOf2Hours.get()});
-            capturedInvalidMessages = capturedInvalidMessages.slice(-5);
+   var calculateAveragePulsesIgnoringIndex = function calculateAveragePulsesIgnoringIndex(pulses, indexToIgnore) {
+      var sum = 0;
+      for(var index = 0; index < pulses.length; index++) {
+         if (index !== indexToIgnore) {
+            sum += pulses[index];
+         }
+      }
+      return sum / (pulses.length - 1);
+   };
+
+   var calculateStandardDevationOfPulsesIgnoringIndex = function calculateStandardDevationOfPulsesIgnoringIndex(pulses, pulsesAverage, indexToIgnore) {
+      var sum = 0;
+      for (var index = 0; index < pulses.length; index++) {
+         if (index !== indexToIgnore) {
+            sum += Math.pow(pulses[index] - pulsesAverage, 2);
+         }
+      }
+      return Math.pow(sum / (pulses.length - 1), 0.5);
+   };
+
+   var removeIndexFromArray = function removeIndexFromArray(data, indexToRemove) {
+      var result = [];
+      for (var index = 0; index < data.length; index++) {
+         if (index !== indexToRemove) {
+            result.push(data[index]);
+         }
+      }
+      return result;
+   };
+
+   /**
+    * This method removes samples whose pulse value is not realistic. This sporadically happens when a lightning hits the ground close to the sensor.
+    */
+   var removeOutliers = function removeOutliers(message, nowAsIsoString) {
+      if (message !== undefined && message.anemometerPulses !== undefined && message.directionVaneValues !== undefined &&
+            message.anemometerPulses.length > 0 && message.directionVaneValues.length > 0) {
+         var indicesToRemove = [];
+         for (var index = 0; index < message.anemometerPulses.length; index++) {
+            var pulsesAverage = calculateAveragePulsesIgnoringIndex(message.anemometerPulses, index);
+            var standardDeviationOfPulses = calculateStandardDevationOfPulsesIgnoringIndex(message.anemometerPulses, pulsesAverage, index);
+            if (message.anemometerPulses[index] >= (pulsesAverage + 5 * standardDeviationOfPulses)) {
+               indicesToRemove.push(index);
+            }
+         }
+         
+         if (indicesToRemove.length > 0) {
+            var originalMessage = JSON.parse(JSON.stringify(message)); // creating a clone of the message
+            var pulses          = message.anemometerPulses;
+            var directions      = message.directionVaneValues;
+
+            indicesToRemove.forEach(indexToRemove => {
+               pulses     = removeIndexFromArray(pulses, indexToRemove);
+               directions = removeIndexFromArray(directions, indexToRemove);
+            });
+
+            message.anemometerPulses    = pulses;
+            message.directionVaneValues = directions;
+            
+            messagesContainingOutliers.push({timestamp: nowAsIsoString, original: originalMessage, removedIndices: indicesToRemove});
+            messagesContainingOutliers = messagesContainingOutliers.slice(-5);
          }
       }
    };
@@ -125,7 +180,7 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionalAve
          lastSequenceId = message.sequenceId;
          var nowAsIsoString = timestampFactory();
          
-         captureMessagesWithInvalidPulses(message, nowAsIsoString);
+         removeOutliers(message, nowAsIsoString);
          captureSensorErrors(message, nowAsIsoString);
          
          database.insert(message);
@@ -204,8 +259,8 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionalAve
    };
 
    // for debugging only
-   this.getInvalidMessages = function getInvalidMessages() {
-      return capturedInvalidMessages;
+   this.getMessagesContainingOutliers = function getMessagesContainingOutliers() {
+      return messagesContainingOutliers;
    };
 
    // for debugging only

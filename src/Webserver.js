@@ -123,8 +123,8 @@ app.get(/\/windsensor\/history\/\d+/, (request, response) => {
 app.get(/\/info/, (request, response) => {
     var path = request.path;
     LOGGER.logDebug('GET request [path: ' + path + ']');
-    info.invalidMessages   = sensor.getInvalidMessages();
-    info.sensorErrors      = sensor.getSensorErrors();
+    info.messagesContainingOutliers = sensor.getMessagesContainingOutliers();
+    info.sensorErrors               = sensor.getSensorErrors();
     response.status(200).json(info);
 });
 
