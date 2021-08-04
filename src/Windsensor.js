@@ -18,8 +18,9 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionalAve
    var MESSAGE_VERSION = '1.0.0';
    var TEN_MINUTES     = 10 * 60 * 1000;
    
-   var messagesContainingOutliers   = [];
-   var capturedSensorErrors      = [];
+   var messagesContainingOutliers            = [];
+   var capturedSensorErrors                  = [];
+   var messagesContainingPulsesGreaterThan30 = [];
 
    LOGGER.logInfo('creating windsensor [id = ' + id + ', direction = ' + direction + '°] ...');
 
@@ -158,7 +159,7 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionalAve
             message.directionVaneValues = directions;
             
             messagesContainingOutliers.push({timestamp: nowAsIsoString, original: originalMessage, removedIndices: indicesToRemove});
-            messagesContainingOutliers = messagesContainingOutliers.slice(-5);
+            messagesContainingOutliers = messagesContainingOutliers.slice(-10);
          }
       }
    };
@@ -170,6 +171,15 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionalAve
       }
    };
 
+   var captureMessagesContainingPulsesGreaterThan30 = function captureMessagesContainingPulsesGreaterThan30(message, nowAsIsoString) {
+      if (message !== undefined && message.anemometerPulses !== undefined && message.anemometerPulses.length > 0) {
+         if (message.anemometerPulses.filter(pulses => pulses > 30).length > 0) {
+            messagesContainingPulsesGreaterThan30.push({timestamp: nowAsIsoString, message: message});
+            messagesContainingPulsesGreaterThan30 = messagesContainingPulsesGreaterThan30.slice(-10);
+         }
+      }
+   };
+   
    /**
     * processMessage gets called to provide new sensor data for processing.
     * 
@@ -181,6 +191,7 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionalAve
          lastSequenceId = message.sequenceId;
          var nowAsIsoString = timestampFactory();
          
+         captureMessagesContainingPulsesGreaterThan30(message, nowAsIsoString);
          removeOutliers(message, nowAsIsoString);
          captureSensorErrors(message, nowAsIsoString);
          
@@ -262,6 +273,11 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionalAve
    // for debugging only
    this.getMessagesContainingOutliers = function getMessagesContainingOutliers() {
       return messagesContainingOutliers;
+   };
+
+   // for debugging only
+   this.getMessagesContainingPulsesGreaterThan30 = function getMessagesContainingPulsesGreaterThan30() {
+      return messagesContainingPulsesGreaterThan30;
    };
 
    // for debugging only
