@@ -471,26 +471,14 @@ describe('Windsensor', function() {
       thenVersionOfDataOfLast2HoursShouldBe('1.0.0');
    });
 
-   it('anemometer pulses get removed if they differ from average for at least 5 times the standard deviation', function() {
+   it('anemometer pulses and their following 0 get removed if they are at least 25 (10 bft) and the difference from the average (of all pulses) is at least 2 times the standard deviation', function() {
       givenAWindsensor();
-      var anemometerPulses    = [17,17,17,17,45,3,3,3,3];
-      var directionVaneValues = [ 0, 1, 2, 3, 4,5,6,7,8];
+      var anemometerPulses    = [10, 10, 10, 10, 25, 0, 9, 9, 9, 9];
+      var directionVaneValues = [ 0,  1,  2,  3,  4, 5, 6, 7, 8, 9];
       var message = givenMessage(anemometerPulses, directionVaneValues);
       whenMessageGetsProcessed(message);
-      var expectedAnemometerPulses    = [17,17,17,17,3,3,3,3];
-      var expectedDirectionVaneValues = [ 0, 1, 2, 3,5,6,7,8];
-      var expectedMessage = givenMessage(expectedAnemometerPulses, expectedDirectionVaneValues);
-      thenTheMessageShouldHaveBeenInsertedIntoDatabase(expectedMessage);
-   });
-
-   it('anemometer pulses get removed if they differ from average for at least 30 pulses if standard deviation is below 30/5', function() {
-      givenAWindsensor();
-      var anemometerPulses    = [15,15,15,15,15,15,45,15,15];
-      var directionVaneValues = [ 0, 1, 2, 3, 4, 5, 6, 7, 8];
-      var message = givenMessage(anemometerPulses, directionVaneValues);
-      whenMessageGetsProcessed(message);
-      var expectedAnemometerPulses    = [15,15,15,15,15,15,15,15];
-      var expectedDirectionVaneValues = [ 0, 1, 2, 3, 4, 5, 7, 8];
+      var expectedAnemometerPulses    = [10, 10, 10, 10, 9, 9, 9, 9];
+      var expectedDirectionVaneValues = [ 0,  1,  2,  3, 6, 7, 8, 9];
       var expectedMessage = givenMessage(expectedAnemometerPulses, expectedDirectionVaneValues);
       thenTheMessageShouldHaveBeenInsertedIntoDatabase(expectedMessage);
    });
