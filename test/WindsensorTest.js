@@ -482,4 +482,16 @@ describe('Windsensor', function() {
       var expectedMessage = givenMessage(expectedAnemometerPulses, expectedDirectionVaneValues);
       thenTheMessageShouldHaveBeenInsertedIntoDatabase(expectedMessage);
    });
+
+   it('anemometer pulses get removed if they are at least 25 (10 bft) and the difference from the average (of all pulses) is at least 2 times the standard deviation', function() {
+      givenAWindsensor();
+      var anemometerPulses    = [10, 10, 10, 10, 25, 9, 9, 9, 9];
+      var directionVaneValues = [ 0,  1,  2,  3,  4, 5, 6, 7, 8];
+      var message = givenMessage(anemometerPulses, directionVaneValues);
+      whenMessageGetsProcessed(message);
+      var expectedAnemometerPulses    = [10, 10, 10, 10, 9, 9, 9, 9];
+      var expectedDirectionVaneValues = [ 0,  1,  2,  3, 5, 6, 7, 8];
+      var expectedMessage = givenMessage(expectedAnemometerPulses, expectedDirectionVaneValues);
+      thenTheMessageShouldHaveBeenInsertedIntoDatabase(expectedMessage);
+   });
 });  
