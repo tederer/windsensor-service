@@ -99,22 +99,33 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionalAve
       return average;
    };
 
-   var calculateAverageOf = function calculateAverageOf(pulses) {
-      var sum = 0;
-      for(var index = 0; index < pulses.length; index++) {
-         sum += pulses[index];
+   var calculateStatisticsFor = function calculateStatisticsFor(data) {
+      if (data.length === 0) {
+         return undefined;
       }
-      return sum / (pulses.length - 1);
-   };
-
-   var calculateStandardDevationOfPulses = function calculateStandardDevationOfPulses(pulses, pulsesAverage) {
+      
       var sum = 0;
-      for (var index = 0; index < pulses.length; index++) {
-         sum += Math.pow(pulses[index] - pulsesAverage, 2);
-      }
-      return Math.pow(sum / (pulses.length - 1), 0.5);
+      data.forEach(value => sum += value);
+      var average = sum / data.length;
+      
+      var squaredDeviationSum = 0;
+      data.forEach(value => squaredDeviationSum += Math.pow((average - value), 2));
+      var variance = squaredDeviationSum / data.length;
+      var standardDeviation = Math.pow(variance, 0.5);
+      
+      var ascendingSortedData = [];
+      data.forEach(value => ascendingSortedData.push(value));
+      ascendingSortedData.sort((a, b) => a - b);
+      
+      var median = ((data.length % 2) === 1) ? ascendingSortedData[(data.length - 1) / 2] : (ascendingSortedData[(data.length / 2) - 1] + ascendingSortedData[(data.length / 2)]) / 2;
+      
+      return {
+         average:           average,
+         median:            median,
+         standardDeviation: standardDeviation
+      };
    };
-
+   
    var removeIndexFromArray = function removeIndexFromArray(data, indexToRemove) {
       var result = [];
       for (var index = 0; index < data.length; index++) {
@@ -135,21 +146,23 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionalAve
     * examples without lightnings:
     *             {"timestamp":"2021-08-29T15:36:11.415Z","message":{"version":"1.0.0","sequenceId":871,"anemometerPulses":[5,6,7,7,7,6,6,7,6,7,7,6,7,6,7,6,5,6,6,6,5,6,34,6,6,6,7,7,7,7,7,6,6,5,6,5,5,6,7,9,9,9,9,9,9,9,9,10,10,9,10,8,9,7,7,6,7,9,8,9],"directionVaneValues":[2371,2516,2554,2543,2603,2786,2630,2517,2431,2591,2523,2495,2527,2471,2530,2465,2527,2635,2635,2735,2477,2551,2482,2491,2551,2633,2659,2607,2649,2623,2750,2614,2701,2653,2577,2581,2427,2544,2503,2655,2607,2623,2578,2586,2530,2494,2383,2511,2373,2594,2639,2445,2698,2658,2605,2640,2602,2559,2511,2448],"errors":[]}}
     
-    * Observation: Until now a peak value caused by a lightning is always followed by a 0. Peak note caused by lightnings do not have this 0.
+    * Observation: Until now a peak value caused by a lightning is always followed by a 0. Peak not caused by lightnings do not have this 0.
     */
    var removeOutliers = function removeOutliers(message, nowAsIsoString) {
-      if (message !== undefined && message.anemometerPulses !== undefined && message.directionVaneValues !== undefined &&
-            message.anemometerPulses.length > 0 && message.directionVaneValues.length > 0) {
+      var pulseCount = message.anemometerPulses.length;
 
-         var indicesToRemove           = [];
-         var averagePulses             = calculateAverageOf(message.anemometerPulses);
-         var standardDeviationOfPulses = calculateStandardDevationOfPulses(message.anemometerPulses, averagePulses);
-         
-         for (var index = 0; index < (message.anemometerPulses.length - 1); index++) {
-            var absoluteDiff = Math.abs(averagePulses - message.anemometerPulses[index]);
-            if (message.anemometerPulses[index] >= 25 && absoluteDiff >= (2 * standardDeviationOfPulses)) {
+      if (message !== undefined && message.anemometerPulses !== undefined && message.directionVaneValues !== undefined &&
+            pulseCount > 0 && message.directionVaneValues.length === pulseCount) {
+
+         var indicesToRemove = [];
+         var statistics      = calculateStatisticsFor(message.anemometerPulses);
+         var threshold       = statistics.median + 2 * statistics.standardDeviation;
+
+         for (var index = 0; index < message.anemometerPulses.length; index++) {
+            var currentPulses = message.anemometerPulses[index];
+            if (currentPulses >= 25 && currentPulses >= threshold) {
                indicesToRemove.push(index);
-               if (message.anemometerPulses[index + 1] === 0) {
+               if (index < (pulseCount - 1) && message.anemometerPulses[index + 1] === 0) {
                   indicesToRemove.push(index + 1);
                }
             }
