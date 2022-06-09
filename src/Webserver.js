@@ -7,11 +7,11 @@ require('./InputMessageValidator.js');
 
 var LOGGER = windsensor.logging.LoggingSystem.createLogger('Webserver');
 
-var configuredlogLevel		= process.env.LOG_LEVEL;
-var sensorId				= process.env.SENSOR_ID;
-var sensorDirection			= process.env.SENSOR_DIRECTION;
+var configuredlogLevel		   = process.env.LOG_LEVEL;
+var sensorId				      = process.env.SENSOR_ID;
+var sensorDirection			   = process.env.SENSOR_DIRECTION;
 var sensorDirectionAsNumber	= Number.parseFloat(sensorDirection);
-var messageValidator         = new windsensor.InputMessageValidator();
+var messageValidator          = new windsensor.InputMessageValidator();
 
 var logLevel = windsensor.logging.Level.INFO;
 if (configuredlogLevel !== undefined && windsensor.logging.Level[configuredlogLevel] !== undefined) {
@@ -71,31 +71,32 @@ var sensorIdInRequestPathIsCorrect = function sensorIdInRequestPathIsCorrect(pat
 assertValidSensorId();
 assertValidSensorDirection();
 
-var express 	= require('express');
-var bodyParser  = require('body-parser');
-var app 		= express();
-var port		= 80;
-var database 	= new windsensor.database.InMemoryDatabase();
-var sensor		= new windsensor.Windsensor(sensorId, sensorDirectionAsNumber, database);
+var express 	   = require('express');
+var bodyParser    = require('body-parser');
+var app 		      = express();
+var port		      = 80;
+var database 	   = new windsensor.database.InMemoryDatabase();
+var sensor		   = new windsensor.Windsensor(sensorId, sensorDirectionAsNumber, database);
 
 app.use(bodyParser.json({ type: 'application/json' }));
 
 app.post(/\/windsensor\/\d+/, (request, response) => {
-    var path           = request.path;
-    var message        = request.body;
-    var isValidMessage = messageValidator.validate(message);
+   var path             = request.path;
+   var message          = request.body;
+   var isValidV1Message = messageValidator.isValidV1Message(message);
+   var isValidV2Message = messageValidator.isValidV2Message(message);
 
-    LOGGER.logDebug('POST request [path: ' + path + ', body: ' + JSON.stringify(message) + ']');
+   LOGGER.logDebug('POST request [path: ' + path + ', body: ' + JSON.stringify(message) + ']');
 
-    if (sensorIdInRequestPathIsCorrect(path) && isValidMessage) {
-        response.status(200).send('accepted');
-        sensor.processMessage(message);
-    } else {
-        response.status(400).send('invalid request/message');
-        if (!isValidMessage) {
-            LOGGER.logError('ignoring invalid message: ' + JSON.stringify(message));
-        }
-    }
+   if (sensorIdInRequestPathIsCorrect(path) && (isValidV1Message || isValidV2Message)) {
+      response.status(200).send('accepted');
+      sensor.processMessage(message);
+   } else {
+      response.status(400).send('invalid request/message');
+      if (!isValidV1Message) {
+         LOGGER.logError('ignoring invalid message: ' + JSON.stringify(message));
+      }
+   }
 });
 
 app.get(/\/windsensor\/\d+/, (request, response) => {

@@ -19,9 +19,11 @@ windsensor.database.InMemoryDatabase = function InMemoryDatabase(optionalTimeSou
 		return documents.findIndex(d => d.timestamp >= timestampOfOldestDocument);
 	};
 
-	this.insert = function insert(document) {
-		LOGGER.logDebug(() => 'inserting ' + JSON.stringify(document));
-		documents.push({timestamp: getNowInMillis(), document: document});
+	this.insert = function insert(document, optionalTimestamp) {
+      var optionalTimestampForLogging = (optionalTimestamp === undefined) ? '' : ' at ' + (new Date(optionalTimestamp)).toISOString();
+		LOGGER.logDebug(() => 'inserting ' + JSON.stringify(document) + optionalTimestampForLogging);
+      var timestamp = (optionalTimestamp === undefined) ? getNowInMillis() : optionalTimestamp;
+		documents.push({timestamp: timestamp, document: document});
 	};
 
 	this.getAllDocumentsNotOlderThan = function getAllDocumentsNotOlderThan(maxAgeInMillis) {

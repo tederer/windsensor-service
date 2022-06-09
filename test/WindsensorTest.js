@@ -6,7 +6,22 @@ require('./Utils.js');
 
 var utils = new testing.Utils();
 
-var ANY_MESSAGE = {'version':'1.0.0','sequenceId':5,'anemometerPulses':[0,0,0,0,0],'directionVaneValues':[32,38,35,38,39]};
+var ANY_V1_MESSAGE = {
+   'version':'1.0.0',
+   'sequenceId':5,
+   'anemometerPulses':[0,0,0,0,0],
+   'directionVaneValues':[32,38,35,38,39]
+};
+var V2_ENVELOPE_WITH_TWO_MESSAGES = {
+   'version':'2.0.0',
+   'sequenceId':987, 
+   'messages':[
+      {'anemometerPulses':[0,1], 'directionVaneValues':[32,38], 'secondsSincePreviousMessage':0}, 
+      {'anemometerPulses':[2,1], 'directionVaneValues':[22,20], 'secondsSincePreviousMessage':62}
+   ], 
+   'errors': []
+};
+
 var SENSOR_ID = '123456';
 var UNDEFINED_AVERAGER_RESULT = {direction: {average: undefined}, speed: {average: undefined, minimum: undefined, maximum: undefined}};
 
@@ -17,7 +32,7 @@ var testingDatabase;
 var testingAveragerFactory;
 var testing1minAverager;
 var testing10minAverager;
-var testingTimestampFactory;
+var testingTimeSource;
 var lastMessageProvidedForProcessing;
 var averages;
 var dataOfLast2Hours;
@@ -69,7 +84,11 @@ var createMockedAverage = function createMockedAverage() {
 
 var givenAWindsensor = function givenAWindsensor(optionalId) {
    sensorId = (optionalId === undefined) ? SENSOR_ID : optionalId;
-   sensor = new windsensor.Windsensor(sensorId, direction, testingDatabase, testingAveragerFactory, testingTimestampFactory);
+   var optionals = {
+      averagerFactory:  testingAveragerFactory, 
+      timeSource:       testingTimeSource
+   };
+   sensor = new windsensor.Windsensor(sensorId, direction, testingDatabase, optionals);
 };
 
 var givenAWindsensorWithADirection = function givenAWindsensorWithADirection(directionToUse) {
@@ -84,6 +103,15 @@ var EmptyMessage = function emptyMessage() {
    this.directionVaneValues   = [];
 };
 
+var createV2EnvelopeWithMessages = function createV2EnvelopeWithMessages(messages) {
+   return {
+      'version':'2.0.0',
+      'sequenceId':987, 
+      'messages': messages, 
+      'errors': []
+   };
+};
+
 var givenMessage = function givenMessage(anemometerPulses, directionVaneValues) {
    var message = new EmptyMessage();
    message.anemometerPulses      = anemometerPulses;
@@ -91,7 +119,7 @@ var givenMessage = function givenMessage(anemometerPulses, directionVaneValues) 
    return message;
 };
 
-var givenMessageGetsProcessed = function givenMessageGetsProcessed(message, optionalId) {
+var givenMessageGetsProcessed = function givenMessageGetsProcessed(message) {
    sensor.processMessage(message);
    lastMessageProvidedForProcessing = message;
 };
@@ -116,21 +144,21 @@ var givenTenMinuteAveragerReturnsAverageDirection = function givenTenMinuteAvera
    givenTenMinuteAveragerReturns([value]);
 };
 
-var givenTimestampFactoryReturns = function givenTimestampFactoryReturns(timestampToReturn) {
+var givenTimeSourceReturns = function givenTimeSourceReturns(timestampToReturn) {
    timestamps = [timestampToReturn];
    timestampIndex = 0;
 };
 
 var whenSameMessageGetsProcessedAgain = function whenSameMessageGetsProcessedAgain() {
-   givenMessageGetsProcessed(lastMessageProvidedForProcessing, SENSOR_ID);
+   givenMessageGetsProcessed(lastMessageProvidedForProcessing);
 };
 
 var whenAWindsensorGetsCreated = function whenAWindsensorGetsCreated() {
    givenAWindsensor();
 };
 
-var whenMessageGetsProcessed = function whenMessageGetsProcessed(message, id) {
-   givenMessageGetsProcessed(message, id);
+var whenMessageGetsProcessed = function whenMessageGetsProcessed(message) {
+   givenMessageGetsProcessed(message);
 };
 
 var whenAveragesGetRequested = function whenAveragesGetRequested() {
@@ -141,10 +169,6 @@ var whenDataOfLast2HoursGetRequested = function whenDataOfLast2HoursGetRequested
    dataOfLast2Hours = sensor.getDataOfLast2Hours();
 };
 
-var thenNothingShouldGetInsertedIntoDatabase = function thenNothingShouldGetInsertedIntoDatabase() {
-   expect(testingDatabase.insertedDocuments.length).to.be.eql(0);
-};
-
 var thenTheMessageShouldHaveBeenInsertedIntoDatabase = function thenTheMessageShouldHaveBeenInsertedIntoDatabase(expectedMessage) {
    var documents = testingDatabase.insertedDocuments;
    var lastInsertedDocument = (documents.length > 0) ? documents[documents.length - 1] : undefined;
@@ -153,6 +177,11 @@ var thenTheMessageShouldHaveBeenInsertedIntoDatabase = function thenTheMessageSh
 
 var thenTheNumberOfInsertedMessagesInDatabaseShouldBe = function thenTheNumberOfInsertedMessagesInDatabaseShouldBe(expectedMessageCount) {
    expect(testingDatabase.insertedDocuments.length).to.be.eql(expectedMessageCount);
+};
+
+var thenTheTimestampOfTheInsertedMessagesShouldBe = function thenTheTimestampOfTheInsertedMessagesShouldBe(expectedTimestamps) {
+   console.log(testingDatabase.insertedDocuments.map(doc => doc.timestamp));
+   expect(testingDatabase.timestamps).to.be.eql(expectedTimestamps);
 };
 
 var thenDatabaseEntriesOlderThan10MinutesShouldHaveBeenRemovedTimes = function thenDatabaseEntriesOlderThan10MinutesShouldHaveBeenRemovedTimes(times) {
@@ -192,11 +221,11 @@ var thenThe10minAveragerShouldNotHaveBeenTriggered = function thenThe10minAverag
    thenThe10minAveragerShouldHaveBeenTriggeredTimes(0);
 };
 
-var then1minAverageShouldHaveBennCreatedWithDatabase = function then1minAverageShouldHaveBennCreatedWithDatabase() {
+var then1minAverageShouldHaveBeenCreatedWithDatabase = function then1minAverageShouldHaveBeenCreatedWithDatabase() {
    expect(testing1minAverager.database).to.be.eql(testingDatabase);
 };
 
-var then10minAverageShouldHaveBennCreatedWithDatabase = function then10minAverageShouldHaveBennCreatedWithDatabase() {
+var then10minAverageShouldHaveBeenCreatedWithDatabase = function then10minAverageShouldHaveBeenCreatedWithDatabase() {
    expect(testing10minAverager.database).to.be.eql(testingDatabase);
 };
 
@@ -258,9 +287,11 @@ var setup = function setup() {
    
    testingDatabase = {
       insertedDocuments: [],
+      timestamps: [],
       removeAllDocumentsOlderThanInvocations: [],
 
-      insert: function insert(document) {
+      insert: function insert(document, optionalTimestamp) {
+         this.timestamps.push(optionalTimestamp);
          this.insertedDocuments.push(document);
       },
 
@@ -286,12 +317,15 @@ var setup = function setup() {
       }
    };
 
-   testingTimestampFactory = function testingTimestampFactory() {
+   testingTimeSource = function testingTimeSource() {
+      if (timestamps.length === 0) {
+         return Date.now();
+      }
       var timestamp = timestamps[timestampIndex];
-      if (timestampIndex < timestamps.length) {
+      if (timestampIndex < (timestamps.length - 1)) {
          timestampIndex++;
       }
-      return timestamp;
+      return (new Date(timestamp)).getTime();
    };
 };
 
@@ -306,7 +340,7 @@ describe('Windsensor', function() {
 
    it('the constructor of the windsensor provides the database to the 1min averager', function() {
       whenAWindsensorGetsCreated();
-      then1minAverageShouldHaveBennCreatedWithDatabase();
+      then1minAverageShouldHaveBeenCreatedWithDatabase();
    });
 
    it('the constructor of the windsensor creates a 10min averager', function() {
@@ -316,45 +350,71 @@ describe('Windsensor', function() {
 
    it('the constructor of the windsensor provides the database to the 10min averager', function() {
       whenAWindsensorGetsCreated();
-      then10minAverageShouldHaveBennCreatedWithDatabase();
+      then10minAverageShouldHaveBeenCreatedWithDatabase();
    });
    
    it('a message with the same sequence ID does not get inserted into the database', function() {
       givenAWindsensor();
-      givenMessageGetsProcessed(ANY_MESSAGE);
+      givenMessageGetsProcessed(ANY_V1_MESSAGE);
       whenSameMessageGetsProcessedAgain();
       thenTheNumberOfInsertedMessagesInDatabaseShouldBe(1);
    });
    
+   it('all messages in a V2 message envelope get added to the database', function() {
+      givenAWindsensor();
+      givenMessageGetsProcessed(V2_ENVELOPE_WITH_TWO_MESSAGES);
+      thenTheNumberOfInsertedMessagesInDatabaseShouldBe(2);
+   });
+   
+   it('all messages in a V2 message envelope get added to the database with timestamp', function() {
+      var messages = [
+         {'anemometerPulses':[0,1], 'directionVaneValues':[32,33], 'secondsSincePreviousMessage':0}, 
+         {'anemometerPulses':[2,3], 'directionVaneValues':[34,35], 'secondsSincePreviousMessage':62}
+      ];
+      var v2Envelope = createV2EnvelopeWithMessages(messages);
+      var currentTimeInMsSinceEpoch = 100000;
+      givenTimeSourceReturns((new Date(currentTimeInMsSinceEpoch)).toISOString());
+      givenAWindsensor();
+      whenMessageGetsProcessed(v2Envelope);
+      thenTheTimestampOfTheInsertedMessagesShouldBe([100000 - (62 * 1000), 100000]);
+   });
+   
+   it('a V1 message gets added to the database with current timee as timestamp', function() {
+      var currentTimeInMsSinceEpoch = 20000;
+      givenTimeSourceReturns((new Date(currentTimeInMsSinceEpoch)).toISOString());
+      givenAWindsensor();
+      whenMessageGetsProcessed(ANY_V1_MESSAGE);
+      thenTheTimestampOfTheInsertedMessagesShouldBe([currentTimeInMsSinceEpoch]);
+   });
+   
    it('every new message requests the database to remove all entries older than 10 minutes', function() {
       givenAWindsensor();
-      givenMessageGetsProcessed(ANY_MESSAGE);
-      whenSameMessageGetsProcessedAgain();
+      whenMessageGetsProcessed(ANY_V1_MESSAGE);
       thenDatabaseEntriesOlderThan10MinutesShouldHaveBeenRemovedTimes(1);
    });
 
    it('1min averager gets triggered to recalculate the averages on a new message', function() {
       givenAWindsensor();
-      whenMessageGetsProcessed(ANY_MESSAGE);
+      whenMessageGetsProcessed(ANY_V1_MESSAGE);
       thenThe1minAveragerShouldHaveBeenTriggeredOnce();
    });
 
    it('1min averager gets triggered only once on duplicate messages', function() {
       givenAWindsensor();
-      givenMessageGetsProcessed(ANY_MESSAGE);
+      givenMessageGetsProcessed(ANY_V1_MESSAGE);
       whenSameMessageGetsProcessedAgain();
       thenThe1minAveragerShouldHaveBeenTriggeredOnce();
    });
 
    it('10min averager gets triggered to recalculate the averages on a new message', function() {
       givenAWindsensor();
-      whenMessageGetsProcessed(ANY_MESSAGE);
+      whenMessageGetsProcessed(ANY_V1_MESSAGE);
       thenThe10minAveragerShouldHaveBeenTriggeredOnce();
    });
 
    it('10min averager gets triggered only once on duplicate messages', function() {
       givenAWindsensor();
-      givenMessageGetsProcessed(ANY_MESSAGE);
+      givenMessageGetsProcessed(ANY_V1_MESSAGE);
       whenSameMessageGetsProcessedAgain();
       thenThe10minAveragerShouldHaveBeenTriggeredOnce();
    });
@@ -365,7 +425,7 @@ describe('Windsensor', function() {
       givenAWindsensor();
       givenOneMinuteAveragerReturns([averageA]);
       givenTenMinuteAveragerReturns([averageB]);
-      givenMessageGetsProcessed(ANY_MESSAGE);
+      givenMessageGetsProcessed(ANY_V1_MESSAGE);
       whenAveragesGetRequested();
       thenAveragesShouldBe(averageA, averageB);
    });
@@ -374,7 +434,7 @@ describe('Windsensor', function() {
       givenAWindsensor();
       givenOneMinuteAveragerReturns([UNDEFINED_AVERAGER_RESULT]);
       givenTenMinuteAveragerReturns([UNDEFINED_AVERAGER_RESULT]);
-      givenMessageGetsProcessed(ANY_MESSAGE);
+      givenMessageGetsProcessed(ANY_V1_MESSAGE);
       whenAveragesGetRequested();
       thenAveragesShouldBe(UNDEFINED_AVERAGER_RESULT, UNDEFINED_AVERAGER_RESULT);
    });
@@ -387,17 +447,17 @@ describe('Windsensor', function() {
 
    it('getAverages() returns the timestamp of the last invocation of processMessage()', function() {
       givenAWindsensor();
-      givenTimestampFactoryReturns('rightNow');
-      givenMessageGetsProcessed(ANY_MESSAGE);
+      givenTimeSourceReturns('1980-06-03T11:53:40.100Z');
+      givenMessageGetsProcessed(ANY_V1_MESSAGE);
       whenAveragesGetRequested();
-      thenAveragesTimestampShouldBe('rightNow');
+      thenAveragesTimestampShouldBe('1980-06-03T11:53:40.100Z');
    });
 
    it('the direction gets added to the average direction values - A', function() {
       givenAWindsensorWithADirection(degrees(90));
       givenOneMinuteAveragerReturnsAverageDirection(degrees(120.3));
       givenTenMinuteAveragerReturnsAverageDirection(degrees(355.9));
-      givenMessageGetsProcessed(ANY_MESSAGE);
+      givenMessageGetsProcessed(ANY_V1_MESSAGE);
       whenAveragesGetRequested();
       thenAverageDirectionsShouldBe(degrees(210.3), degrees(85.9));
    });
@@ -406,23 +466,23 @@ describe('Windsensor', function() {
       givenAWindsensorWithADirection(degrees(0));
       givenOneMinuteAveragerReturnsAverageDirection(degrees(120.3));
       givenTenMinuteAveragerReturnsAverageDirection(degrees(355.9));
-      givenMessageGetsProcessed(ANY_MESSAGE);
+      givenMessageGetsProcessed(ANY_V1_MESSAGE);
       whenAveragesGetRequested();
       thenAverageDirectionsShouldBe(degrees(120.3), degrees(355.9));
    });
 
    it('the version of the returned averages is 1.0.0', function() {
       givenAWindsensorWithADirection(degrees(0));
-      givenMessageGetsProcessed(ANY_MESSAGE);
+      givenMessageGetsProcessed(ANY_V1_MESSAGE);
       whenAveragesGetRequested();
       thenAveragesVersionShouldBe('1.0.0');
    });
 
    it('getDataOfLast2Hours() returns the average values for the last 2 hours', function() {
       givenAWindsensorWithADirection(degrees(0));
-      givenTimestampFactoryReturns('2021-06-05T11:53:40.100Z');
+      givenTimeSourceReturns('2021-06-03T11:53:40.100Z');
       givenOneMinuteAveragerReturnsAverageDirection(degrees(50.0));
-      givenMessageGetsProcessed(ANY_MESSAGE);
+      givenMessageGetsProcessed(ANY_V1_MESSAGE);
       whenDataOfLast2HoursGetRequested();
       thenDataOfLast2HoursShouldContainDataSamples(1);
    });
@@ -436,9 +496,9 @@ describe('Windsensor', function() {
       givenAWindsensorWithADirection(degrees(0));
       givenOneMinuteAveragerReturns(tuples.map(tuple => tuple.average));
       for(var i = 0; i < 3; i++) {
-         givenTimestampFactoryReturns(tuples[i].timestamp);
-         givenMessageGetsProcessed(ANY_MESSAGE);
-         ANY_MESSAGE.sequenceId++;
+         givenTimeSourceReturns(tuples[i].timestamp);
+         givenMessageGetsProcessed(ANY_V1_MESSAGE);
+         ANY_V1_MESSAGE.sequenceId++;
       }
       whenDataOfLast2HoursGetRequested();
       thenDataOfLast2HoursShouldContain([tuples[1], tuples[2]]);
@@ -453,20 +513,20 @@ describe('Windsensor', function() {
       givenAWindsensorWithADirection(degrees(0));
       givenOneMinuteAveragerReturns(tuples.map(tuple => tuple.average));
       for(var i = 0; i < 3; i++) {
-         givenTimestampFactoryReturns(tuples[i].timestamp);
-         givenMessageGetsProcessed(ANY_MESSAGE);
-         ANY_MESSAGE.sequenceId++;
+         givenTimeSourceReturns(tuples[i].timestamp);
+         givenMessageGetsProcessed(ANY_V1_MESSAGE);
+         ANY_V1_MESSAGE.sequenceId++;
       }
-      givenTimestampFactoryReturns('2021-06-05T15:53:40.101Z');
+      givenTimeSourceReturns('2021-06-05T15:53:40.101Z');
       whenDataOfLast2HoursGetRequested();
       thenDataOfLast2HoursShouldContain([tuples[2]]);
    });
 
    it('getDataOfLast2Hours() returns a JSON object with version 1.0.0', function() {
       givenAWindsensorWithADirection(degrees(0));
-      givenTimestampFactoryReturns('2021-06-05T11:53:40.100Z');
+      givenTimeSourceReturns('2021-06-05T11:53:40.100Z');
       givenOneMinuteAveragerReturnsAverageDirection(degrees(50.0));
-      givenMessageGetsProcessed(ANY_MESSAGE);
+      givenMessageGetsProcessed(ANY_V1_MESSAGE);
       whenDataOfLast2HoursGetRequested();
       thenVersionOfDataOfLast2HoursShouldBe('1.0.0');
    });

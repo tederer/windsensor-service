@@ -10,7 +10,10 @@ windsensor.database.Database = function Database() {
 		return new Error('implementation of windsensor.database.Database did not implement the method \"' + functionName + '\"');
 	};
 	
-	this.insert = function insert(document) {
+   /**
+    * Inserts the provided document. Use the optionalTimestamp (in ms since epoch) if present, otherwise the current time gets used.
+    */
+	this.insert = function insert(document, optionalTimestamp) {
 		throw createErrorFor('insert');
 	};
 	

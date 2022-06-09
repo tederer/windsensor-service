@@ -7,12 +7,13 @@ require('./averaging/Factory.js');
 assertNamespace('windsensor');
 
 /**
- * id                         String                           ID of the windsensor (format = [1-9][0-9]{5})
- * direction                  Number                           the direction (in degrees) of the sensor that should be used when the sensor reports 0°.
- * database                   windsensor.database.Database     the database that should get used to store the data
- * optionalAveragerFactory    windsensor.averaging.Factory     a factory supplying Averagers - required for testing   
+ * id                                   String                           ID of the windsensor (format = [1-9][0-9]{5})
+ * direction                            Number                           the direction (in degrees) of the sensor that should be used when the sensor reports 0°.
+ * database                             windsensor.database.Database     the database that should get used to store the data
+ * optionals.averagerFactory            windsensor.averaging.Factory     a factory supplying Averagers - required for testing   
+ * optionals.timeSource                 Number                           a function returning the current time in ms since epoch
  */
-windsensor.Windsensor = function Windsensor(id, direction, database, optionalAveragerFactory, optionalTimestampFactory) {
+windsensor.Windsensor = function Windsensor(id, direction, database, optionals) {
    
    var LOGGER          = windsensor.logging.LoggingSystem.createLogger('Windsensor[' + id + ']');
    var MESSAGE_VERSION = '1.0.0';
@@ -21,15 +22,15 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionalAve
    var messagesContainingOutliers            = [];
    var capturedSensorErrors                  = [];
    var messagesContainingPulsesGreaterThan30 = [];
-
+   
    LOGGER.logInfo('creating windsensor [id = ' + id + ', direction = ' + direction + '°] ...');
 
-   var defaultTimestampFactory = function defaultTimestampFactory() {
-      return (new Date()).toISOString();
-   };
+   var averagerFactory  = (optionals === undefined || optionals.averagerFactory === undefined) ? windsensor.averaging.Factory : optionals.averagerFactory;
+   var getNowInMillis   = (optionals === undefined || optionals.timeSource === undefined) ? Date.now : optionals.timeSource;
 
-   var averagerFactory = (optionalAveragerFactory === undefined) ? windsensor.averaging.Factory : optionalAveragerFactory;
-   var timestampFactory = (optionalTimestampFactory === undefined) ? defaultTimestampFactory : optionalTimestampFactory;
+   var timeInMsToIsoString = function timeInMsToIsoString(timeInMs) {
+      return (new Date(timeInMs)).toISOString();
+   };
 
    var TwoHourHistory = function TwoHourHistory() {
       var dataOfLast2Hours = [];
@@ -67,7 +68,7 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionalAve
       };
 
       this.get = function get() {
-         var nowAsIsoString = timestampFactory();
+         var nowAsIsoString = timeInMsToIsoString(getNowInMillis());
          removeDataOlderThan2Hours(nowAsIsoString);
          return dataOfLast2Hours;
       };
@@ -202,34 +203,77 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionalAve
          }
       }
    };
+
+   var convertToVersion2 = function convertToVersion2(message) {
+      return (message.version === '2.0.0') ? message : {
+            version: '2.0.0',
+            sequenceId: message.sequenceId,
+            messages: [
+               {
+                  anemometerPulses: message.anemometerPulses, 
+                  directionVaneValues: message.directionVaneValues, 
+                  secondsSincePreviousMessage: 0
+               }],
+            errors: message.errors
+         };
+   };
    
+   var provideEachV2MessageAsV1To = function provideEachV2MessageAsV1To(v2Message, consumerFunction) {
+      var nowInMs = getNowInMillis();
+      for (var i = 0; i < v2Message.messages.length; i++) {
+         var secondsToPutMessageIntoPast = 0;
+         for (var j = i + 1; j < v2Message.messages.length; j++) {
+            secondsToPutMessageIntoPast += v2Message.messages[j].secondsSincePreviousMessage;
+         }
+         var timestampInMs = nowInMs - (secondsToPutMessageIntoPast * 1000);
+
+         var v1Message = {
+            version:             '1.0.0',
+            sequenceId:          v2Message.sequenceId,
+            anemometerPulses:    v2Message.messages[i].anemometerPulses, 
+            directionVaneValues: v2Message.messages[i].directionVaneValues
+         };
+
+         if (v2Message.errors !== undefined) {
+            v1Message.errors = v2Message.errors;
+         }
+
+         consumerFunction(v1Message, timestampInMs);
+      }
+   };
+
    /**
     * processMessage gets called to provide new sensor data for processing.
     * 
     *  message    Object   e.g. {version:"1.0.0",sequenceId:5,anemometerPulses:[0,0,0,0,0],directionVaneValues:[32,38,35,38,39]} 
     */
    this.processMessage = function processMessage(message) {
-      if (isNewSequenceId(message.sequenceId) ) {
-         LOGGER.logInfo(() => 'process message: ' + JSON.stringify(message));
-         lastSequenceId = message.sequenceId;
-         var nowAsIsoString = timestampFactory();
-         
-         captureMessagesContainingPulsesGreaterThan30(message, nowAsIsoString);
-         removeOutliers(message, nowAsIsoString);
-         captureSensorErrors(message, nowAsIsoString);
-         
-         database.insert(message);
-         database.removeAllDocumentsOlderThan(TEN_MINUTES);
-         var oneMinAverage = calculateAverage(oneMinAverager);
-         var tenMinAverage = calculateAverage(tenMinAverager);
-         averages.timestamp = nowAsIsoString;
-         averages.oneMinute = oneMinAverage;
-         averages.tenMinutes = tenMinAverage;
-         historyOf2Hours.add(nowAsIsoString, oneMinAverage);
-         LOGGER.logInfo(() => 'current averages (including direction correction): ' + JSON.stringify(averages));
-      } else {
+      if (!isNewSequenceId(message.sequenceId) ) {
          LOGGER.logWarning(() => 'ignoring message because sequence ID is not a new one in the following message: ' + JSON.stringify(message));
+         return;
       }
+
+      LOGGER.logInfo(() => 'process message: ' + JSON.stringify(message));
+      var nowAsIsoString   = timeInMsToIsoString(getNowInMillis());
+      lastSequenceId       = message.sequenceId;
+      var v2Message        = convertToVersion2(message);
+      
+      provideEachV2MessageAsV1To(v2Message, (v1Message, timeStampInMs) => {
+         var timeStampAsISOString = timeInMsToIsoString(timeStampInMs);
+         captureMessagesContainingPulsesGreaterThan30(v1Message, timeStampAsISOString);
+         removeOutliers(v1Message, timeStampAsISOString);
+         captureSensorErrors(v1Message, timeStampAsISOString);
+         database.insert(v1Message, timeStampInMs);
+      });
+   
+      database.removeAllDocumentsOlderThan(TEN_MINUTES);
+      var oneMinAverage = calculateAverage(oneMinAverager);
+      var tenMinAverage = calculateAverage(tenMinAverager);
+      averages.timestamp = nowAsIsoString;
+      averages.oneMinute = oneMinAverage;
+      averages.tenMinutes = tenMinAverage;
+      historyOf2Hours.add(nowAsIsoString, oneMinAverage);
+      LOGGER.logInfo(() => 'current averages (including direction correction): ' + JSON.stringify(averages));
    };
 
    /**

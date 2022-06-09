@@ -22,7 +22,7 @@ var testingTimeSource = function testingTimeSource() {
    return timestamp;
 };
 
-var whenGettingDocumentsNotOlderThan = function whenGettingDocumentsNotOlderThan(durationInMillis) {
+var whenGettingDocumentsNotOlderThanMs = function whenGettingDocumentsNotOlderThanMs(durationInMillis) {
    wrappedDocuments = database.getAllDocumentsNotOlderThan(durationInMillis);
    documents = wrappedDocuments.map(wrapper => wrapper.document);
    timestamps = wrappedDocuments.map(wrapper => wrapper.timestamp);
@@ -51,7 +51,7 @@ describe('InMemoryDatabase', function() {
       database.insert({name: 'Thomas', age:13});
 		database.insert({name: 'Daisy', age:42});
 		database.insert({name: 'Mike', age:27});
-      whenGettingDocumentsNotOlderThan(400);
+      whenGettingDocumentsNotOlderThanMs(400);
       expect(documents.length).to.be.eql(2);
       expect(documents.map(d => d.name)).to.be.eql(['Daisy','Mike']);
       expect(documents.map(d => d.age)).to.be.eql([42,27]);
@@ -62,7 +62,7 @@ describe('InMemoryDatabase', function() {
       timestampsToReturn = [5,6,10];
       database.insert('foo');
 		database.insert('bar');
-		whenGettingDocumentsNotOlderThan(4);
+		whenGettingDocumentsNotOlderThanMs(4);
       expect(documents).to.be.eql(['bar']);
       expect(timestamps).to.be.eql([6]);
    });
@@ -71,7 +71,7 @@ describe('InMemoryDatabase', function() {
       timestampsToReturn = [5,6,10];
       database.insert('foo');
 		database.insert('bar');
-		whenGettingDocumentsNotOlderThan(3);
+		whenGettingDocumentsNotOlderThanMs(3);
       expect(documents.length).to.be.eql(0);
       expect(timestamps.length).to.be.eql(0);
    });
@@ -79,7 +79,7 @@ describe('InMemoryDatabase', function() {
    it('getAllDocumentsNotOlderThan() returns oldest document first', function() {
       database.insert('foo');
 		database.insert('bar');
-		whenGettingDocumentsNotOlderThan(DEFAULT_TIMESTAMP);
+		whenGettingDocumentsNotOlderThanMs(DEFAULT_TIMESTAMP);
       expect(documents).to.be.eql(['foo','bar']);
    });
 
@@ -89,7 +89,7 @@ describe('InMemoryDatabase', function() {
 		database.insert('bar');
       database.insert('qwertz');
       database.removeAllDocumentsOlderThan(1);
-		whenGettingDocumentsNotOlderThan(1);
+		whenGettingDocumentsNotOlderThanMs(1);
       expect(documents).to.be.eql(['bar','qwertz']);
    });
 
@@ -99,7 +99,7 @@ describe('InMemoryDatabase', function() {
 		database.insert('bar');
       database.insert('qwertz');
       database.removeAllDocumentsOlderThan(1);
-		whenGettingDocumentsNotOlderThan(0);
+		whenGettingDocumentsNotOlderThanMs(0);
       expect(documents).to.be.eql(['qwertz']);
    });
 
@@ -109,7 +109,15 @@ describe('InMemoryDatabase', function() {
 		database.insert('bar');
       database.insert('qwertz');
       database.removeAllDocumentsOlderThan(7);
-		whenGettingDocumentsNotOlderThan(10);
+		whenGettingDocumentsNotOlderThanMs(10);
       expect(documents).to.be.eql(['qwertz']);
+   });
+
+   it('the timestamp provided to insert() gets used instead of the current time', function() {
+      timestampsToReturn = [1000];
+      database.insert('foo', 500);
+		database.insert('bar');
+      whenGettingDocumentsNotOlderThanMs(300);
+      expect(documents).to.be.eql(['bar']);
    });
 });  
