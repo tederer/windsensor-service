@@ -258,11 +258,12 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionals) 
       lastSequenceId       = message.sequenceId;
       var v2Message        = convertToVersion2(message);
       
+      captureSensorErrors(v2Message, nowAsIsoString);
+         
       provideEachV2MessageAsV1To(v2Message, (v1Message, timeStampInMs) => {
          var timeStampAsISOString = timeInMsToIsoString(timeStampInMs);
          captureMessagesContainingPulsesGreaterThan30(v1Message, timeStampAsISOString);
          removeOutliers(v1Message, timeStampAsISOString);
-         captureSensorErrors(v1Message, timeStampAsISOString);
          database.insert(v1Message, timeStampInMs);
       });
    
