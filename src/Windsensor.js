@@ -248,12 +248,14 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionals) 
     *  message    Object   e.g. {version:"1.0.0",sequenceId:5,anemometerPulses:[0,0,0,0,0],directionVaneValues:[32,38,35,38,39]} 
     */
    this.processMessage = function processMessage(message) {
+      
+      LOGGER.logInfo(() => 'process message: ' + JSON.stringify(message));
+      
       if (!isNewSequenceId(message.sequenceId) ) {
-         LOGGER.logWarning(() => 'ignoring message because sequence ID is not a new one in the following message: ' + JSON.stringify(message));
+         LOGGER.logWarning(() => 'ignoring message because sequence ID is not new (lastSequenceId=' + lastSequenceId + ', currentSequenceId=' + message.sequenceId);
          return;
       }
 
-      LOGGER.logInfo(() => 'process message: ' + JSON.stringify(message));
       var nowAsIsoString   = timeInMsToIsoString(getNowInMillis());
       lastSequenceId       = message.sequenceId;
       var v2Message        = convertToVersion2(message);

@@ -83,19 +83,23 @@ app.use(bodyParser.json({ type: 'application/json' }));
 app.post(/\/windsensor\/\d+/, (request, response) => {
    var path             = request.path;
    var message          = request.body;
-   var isValidV1Message = messageValidator.isValidV1Message(message);
-   var isValidV2Message = messageValidator.isValidV2Message(message);
 
    LOGGER.logDebug('POST request [path: ' + path + ', body: ' + JSON.stringify(message) + ']');
 
-   if (sensorIdInRequestPathIsCorrect(path) && (isValidV1Message || isValidV2Message)) {
+   var isValidV1Message = messageValidator.isValidV1Message(message);
+   var isValidV2Message = messageValidator.isValidV2Message(message);
+   var isValidMessage   = isValidV1Message || isValidV2Message;
+
+   if (sensorIdInRequestPathIsCorrect(path) && isValidMessage) {
       response.status(200).send('accepted');
       sensor.processMessage(message);
    } else {
-      response.status(400).send('invalid request/message');
-      if (!isValidV1Message) {
+      if (!isValidMessage) {
          LOGGER.logError('ignoring invalid message: ' + JSON.stringify(message));
+      } else {
+         LOGGER.logError('ignoring message for other sensor (path=' + path + '): ' + JSON.stringify(message));
       }
+      response.status(400).send('invalid request/message');
    }
 });
 
