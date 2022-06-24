@@ -180,7 +180,6 @@ var thenTheNumberOfInsertedMessagesInDatabaseShouldBe = function thenTheNumberOf
 };
 
 var thenTheTimestampOfTheInsertedMessagesShouldBe = function thenTheTimestampOfTheInsertedMessagesShouldBe(expectedTimestamps) {
-   console.log(testingDatabase.insertedDocuments.map(doc => doc.timestamp));
    expect(testingDatabase.timestamps).to.be.eql(expectedTimestamps);
 };
 
@@ -366,7 +365,7 @@ describe('Windsensor', function() {
       thenTheNumberOfInsertedMessagesInDatabaseShouldBe(2);
    });
    
-   it('all messages in a V2 message envelope get added to the database with timestamp', function() {
+   it('all messages in a V2 message envelope get added to the database with corresponding timestamp', function() {
       var messages = [
          {'anemometerPulses':[0,1], 'directionVaneValues':[32,33], 'secondsSincePreviousMessage':0}, 
          {'anemometerPulses':[2,3], 'directionVaneValues':[34,35], 'secondsSincePreviousMessage':62}
@@ -531,6 +530,25 @@ describe('Windsensor', function() {
       thenVersionOfDataOfLast2HoursShouldBe('1.0.0');
    });
 
+   it('two hour history contains as many one minute average vales as the V2 message envelope contains messages', function() {
+      var messages = [
+         {'anemometerPulses':[0,1], 'directionVaneValues':[32,33], 'secondsSincePreviousMessage':0}, 
+         {'anemometerPulses':[2,3], 'directionVaneValues':[34,35], 'secondsSincePreviousMessage':62}
+      ];
+      var v2Envelope = createV2EnvelopeWithMessages(messages);
+      var mocked1MinAverageData = [createMockedAverage(), createMockedAverage()];
+      
+      var expected = [  {timestamp: '2021-06-05T11:52:38.100Z', average: mocked1MinAverageData[0]},
+                        {timestamp: '2021-06-05T11:53:40.100Z', average: mocked1MinAverageData[1]}];
+
+      givenTimeSourceReturns('2021-06-05T11:53:40.100Z');
+      givenAWindsensor();
+      givenOneMinuteAveragerReturns(mocked1MinAverageData);
+      givenMessageGetsProcessed(v2Envelope);
+      whenDataOfLast2HoursGetRequested();
+      thenDataOfLast2HoursShouldContain(expected);
+   });
+   
    it('anemometer pulses and their following 0 get removed if they are at least 25 (10 bft) and it is at least 2 times the standard deviation higher than the median', function() {
       givenAWindsensor();
       var anemometerPulses    = [13, 13, 12, 13, 25, 0, 9, 9, 9];

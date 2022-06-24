@@ -142,7 +142,7 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionals) 
     * 
     * lighning examples:   
     *             {"timestamp":"2021-08-16T20:11:13.046Z","message":{"version":"1.0.0","sequenceId":135,"anemometerPulses":[13,14,12,12,12,11,12,10,10,9,9,11,12,12,12,11,10,14,12,11,10,11,10,10,12,11,12,11,11,13,11,10,12,11,9,8,7,9,9,8,10,11,11,12,12,11,11,10,10,9,38,0,7,16,16,24,20,16,13,10],"directionVaneValues":[2047,2241,2167,2167,1904,2243,2195,2063,2263,2415,2358,2219,2221,2097,2161,2219,2174,2169,2206,2315,2303,2203,2143,2186,2225,2205,2202,2259,2213,2275,2271,2171,2064,2239,2192,2177,2481,2127,2047,2035,2335,2275,2259,2285,2284,2255,2298,2243,2319,2327,2283,2222,2161,2279,2263,2269,2183,2258,2195,2203],"errors":[]}},
-	 *             {"timestamp":"2021-08-16T20:14:54.595Z","message":{"version":"1.0.0","sequenceId":138,"anemometerPulses":[9,10,9,9,9,9,8,7,7,7,7,8,10,9,10,10,10,10,11,10,11,10,9,9,8,8,8,8,11,10,10,9,11,11,10,11,10,9,10,10,10,12,10,9,11,12,12,13,11,10,11,11,11,11,12,10,2,2,33,0],"directionVaneValues":[2160,2305,2257,2222,2303,2369,2337,2407,2366,2160,2274,2263,2457,2275,2151,2359,2237,2255,2391,2397,2447,2430,2407,2247,2384,2286,2359,2271,2368,2181,2461,2431,2471,2447,2461,2367,2460,2416,2335,2327,2210,2311,2352,2371,2382,2285,2321,2338,2559,2494,2333,2322,2231,2327,2353,2371,2256,2272,2340,2210],"errors":[]}}
+    *             {"timestamp":"2021-08-16T20:14:54.595Z","message":{"version":"1.0.0","sequenceId":138,"anemometerPulses":[9,10,9,9,9,9,8,7,7,7,7,8,10,9,10,10,10,10,11,10,11,10,9,9,8,8,8,8,11,10,10,9,11,11,10,11,10,9,10,10,10,12,10,9,11,12,12,13,11,10,11,11,11,11,12,10,2,2,33,0],"directionVaneValues":[2160,2305,2257,2222,2303,2369,2337,2407,2366,2160,2274,2263,2457,2275,2151,2359,2237,2255,2391,2397,2447,2430,2407,2247,2384,2286,2359,2271,2368,2181,2461,2431,2471,2447,2461,2367,2460,2416,2335,2327,2210,2311,2352,2371,2382,2285,2321,2338,2559,2494,2333,2322,2231,2327,2353,2371,2256,2272,2340,2210],"errors":[]}}
     * 
     * examples without lightnings:
     *             {"timestamp":"2021-08-29T15:36:11.415Z","message":{"version":"1.0.0","sequenceId":871,"anemometerPulses":[5,6,7,7,7,6,6,7,6,7,7,6,7,6,7,6,5,6,6,6,5,6,34,6,6,6,7,7,7,7,7,6,6,5,6,5,5,6,7,9,9,9,9,9,9,9,9,10,10,9,10,8,9,7,7,6,7,9,8,9],"directionVaneValues":[2371,2516,2554,2543,2603,2786,2630,2517,2431,2591,2523,2495,2527,2471,2530,2465,2527,2635,2635,2735,2477,2551,2482,2491,2551,2633,2659,2607,2649,2623,2750,2614,2701,2653,2577,2581,2427,2544,2503,2655,2607,2623,2578,2586,2530,2494,2383,2511,2373,2594,2639,2445,2698,2658,2605,2640,2602,2559,2511,2448],"errors":[]}}
@@ -261,21 +261,22 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionals) 
       var v2Message        = convertToVersion2(message);
       
       captureSensorErrors(v2Message, nowAsIsoString);
-         
+      
+      var oneMinAverage;
+
       provideEachV2MessageAsV1To(v2Message, (v1Message, timeStampInMs) => {
          var timeStampAsISOString = timeInMsToIsoString(timeStampInMs);
          captureMessagesContainingPulsesGreaterThan30(v1Message, timeStampAsISOString);
          removeOutliers(v1Message, timeStampAsISOString);
          database.insert(v1Message, timeStampInMs);
+         oneMinAverage = calculateAverage(oneMinAverager);
+         historyOf2Hours.add(timeStampAsISOString, oneMinAverage);
       });
    
       database.removeAllDocumentsOlderThan(TEN_MINUTES);
-      var oneMinAverage = calculateAverage(oneMinAverager);
-      var tenMinAverage = calculateAverage(tenMinAverager);
       averages.timestamp = nowAsIsoString;
       averages.oneMinute = oneMinAverage;
-      averages.tenMinutes = tenMinAverage;
-      historyOf2Hours.add(nowAsIsoString, oneMinAverage);
+      averages.tenMinutes = calculateAverage(tenMinAverager);
       LOGGER.logInfo(() => 'current averages (including direction correction): ' + JSON.stringify(averages));
    };
 

@@ -1,6 +1,6 @@
 {
    "name": "windsensor-service",
-   "version": "0.19.0",
+   "version": "0.20.0",
    "description": "server part of the windsensor",
    "private": true,
    "author": {
