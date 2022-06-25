@@ -47,12 +47,15 @@ var degrees = function degrees(value) {
 var TestingAverager = function TestingAverager(database) {
    this.database = database;
    this.calculateAverageInvocationCount = 0;
+   this.capturedTimeOffsetInMs = [];
 
    var returnValues = [];
    var returnValuesIndex = 0;
 
-   this.calculateAverage = function calculateAverage() {
+   this.calculateAverage = function calculateAverage(timeOffsetInMs) {
       this.calculateAverageInvocationCount++;
+      this.capturedTimeOffsetInMs.push(timeOffsetInMs);
+
       var value = returnValues[returnValuesIndex];
       if (returnValuesIndex < returnValues.length) {
          returnValuesIndex++;
@@ -194,6 +197,10 @@ var thenA1minAveragerShouldHaveBeenCreated = function thenA1minAveragerShouldHav
 
 var thenA10minAveragerShouldHaveBeenCreated = function thenA10minAveragerShouldHaveBeenCreated() {
    expect(testingAveragerFactory.create10minAveragerInvocationCount).to.be.eql(1);
+};
+
+var thenThe1minAveragerShouldHaveBeenCalledWithTimeOffsets = function thenThe1minAveragerShouldHaveBeenCalledWithTimeOffsets(expectedTimeOffsets) {
+   expect(testing1minAverager.capturedTimeOffsetInMs).to.be.eql(expectedTimeOffsets);
 };
 
 var thenThe1minAveragerShouldHaveBeenTriggeredTimes = function thenThe1minAveragerShouldHaveBeenTriggeredTimes(times) {
@@ -547,6 +554,19 @@ describe('Windsensor', function() {
       givenMessageGetsProcessed(v2Envelope);
       whenDataOfLast2HoursGetRequested();
       thenDataOfLast2HoursShouldContain(expected);
+   });
+   
+   it('one minute averager gets called with corresponding time offsets for each message in a V2 message envelope', function() {
+      var messages = [
+         {'anemometerPulses':[0,1], 'directionVaneValues':[32,33], 'secondsSincePreviousMessage':0}, 
+         {'anemometerPulses':[2,3], 'directionVaneValues':[34,35], 'secondsSincePreviousMessage':62}
+      ];
+      var v2Envelope = createV2EnvelopeWithMessages(messages);
+       
+      givenTimeSourceReturns('2021-06-05T11:53:40.100Z');
+      givenAWindsensor();
+      whenMessageGetsProcessed(v2Envelope);
+      thenThe1minAveragerShouldHaveBeenCalledWithTimeOffsets([62000, 0]);
    });
    
    it('anemometer pulses and their following 0 get removed if they are at least 25 (10 bft) and it is at least 2 times the standard deviation higher than the median', function() {

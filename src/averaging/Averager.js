@@ -125,15 +125,18 @@ windsensor.averaging.Averager = function Averager(database, durationInMillis, op
      * first sample in the averaging period was received.
      * 
      * For details please have a look at linear_trend.jpg or https://www.crashkurs-statistik.de/einfache-lineare-regression/.
+     * 
+     * arguments:
+     * timeOffsetInMs         Number         milliseconds to add to the duration (defaults to 0 if undefined)
      */
-    this.calculateAverage = function calculateAverage() {
+    this.calculateAverage = function calculateAverage(timeOffsetInMs) {
         var directionAverage = new DirectionAverage();
         var speedAverage = new SpeedAverage();
         var speedTrend = new SpeedTrend();
         var minimumSpeed;
         var maximumSpeed;
         
-        var records = database.getAllDocumentsNotOlderThan(durationInMillis);
+        var records = database.getAllDocumentsNotOlderThan(durationInMillis + ((timeOffsetInMs !== undefined) ? timeOffsetInMs : 0));
 
         records.forEach(record => {
             var timestampInMillis = record.timestamp;

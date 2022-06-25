@@ -125,7 +125,7 @@ var record = function record() {
    return new RecordBuilder();
 };
 
-var whenAverageCalculationGetsTriggered = function whenAverageCalculationGetsTriggered() {
+var whenAverageCalculationGetsTriggeredWithTimeOffset = function whenAverageCalculationGetsTriggeredWithTimeOffset(timeOffsetInMs) {
    if (mappedValues !== undefined) {
       var indices = [];
       for (var i = 0; i < mappedValues.getValueCount(); i++) {
@@ -136,7 +136,11 @@ var whenAverageCalculationGetsTriggered = function whenAverageCalculationGetsTri
          givenDatabaseProvidesRecords([dbRecord]);
       } 
    }
-   calculationResult = averager.calculateAverage();
+   calculationResult = averager.calculateAverage(timeOffsetInMs);
+};
+
+var whenAverageCalculationGetsTriggered = function whenAverageCalculationGetsTriggered() {
+   whenAverageCalculationGetsTriggeredWithTimeOffset();
 };
 
 var thenDatabaseShouldHaveBeenAskedToProvideRecordsNotOlderThan = function whenAverageCalculationGetsTriggered(expectedMaxAgeInMillis) {
@@ -435,5 +439,17 @@ describe('Averager', function() {
       thenTheAverageSpeedShouldBe(kmh(9.34));
       thenTheMinimumSpeedShouldBe(kmh(8.5));
       thenTheMaximumSpeedShouldBe(kmh(12.7));
+   });
+
+   it('0 gets used as time offset if value is undefined', function() {
+      givenAOneMinuteAverager();
+      whenAverageCalculationGetsTriggered();
+      thenDatabaseShouldHaveBeenAskedToProvideRecordsNotOlderThan(60000);
+   });
+
+   it('the time offset gets added to the duration', function() {
+      givenAOneMinuteAverager();
+      whenAverageCalculationGetsTriggeredWithTimeOffset(72000);
+      thenDatabaseShouldHaveBeenAskedToProvideRecordsNotOlderThan(60000 + 72000);
    });
 });  

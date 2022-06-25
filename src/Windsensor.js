@@ -62,7 +62,7 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionals) 
          }
       };
       
-      this.add = function add(nowAsIsoString, oneMinAverage) {
+      this.add = function add(oneMinAverage, nowAsIsoString) {
          dataOfLast2Hours.push(createDataForHistory(nowAsIsoString, oneMinAverage));
          removeDataOlderThan2Hours(nowAsIsoString);
       };
@@ -87,8 +87,8 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionals) 
       return lastSequenceId === undefined || lastSequenceId !== id;
    };
    
-   var calculateAverage = function calculateAverage(averager) {
-      var average = averager.calculateAverage();
+   var calculateAverage = function calculateAverage(averager, timeOffsetInMs) {
+      var average = averager.calculateAverage(timeOffsetInMs);
       LOGGER.logDebug(() => 'calculateAverage (before): ' + JSON.stringify(average));
       if (average.direction.average !== undefined) {
          var sum = average.direction.average + direction;
@@ -218,8 +218,7 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionals) 
          };
    };
    
-   var provideEachV2MessageAsV1To = function provideEachV2MessageAsV1To(v2Message, consumerFunction) {
-      var nowInMs = getNowInMillis();
+   var provideEachV2MessageAsV1To = function provideEachV2MessageAsV1To(nowInMs, v2Message, consumerFunction) {
       for (var i = 0; i < v2Message.messages.length; i++) {
          var secondsToPutMessageIntoPast = 0;
          for (var j = i + 1; j < v2Message.messages.length; j++) {
@@ -256,7 +255,8 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionals) 
          return;
       }
 
-      var nowAsIsoString   = timeInMsToIsoString(getNowInMillis());
+      var nowInMillis      = getNowInMillis();
+      var nowAsIsoString   = timeInMsToIsoString(nowInMillis);
       lastSequenceId       = message.sequenceId;
       var v2Message        = convertToVersion2(message);
       
@@ -264,13 +264,13 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionals) 
       
       var oneMinAverage;
 
-      provideEachV2MessageAsV1To(v2Message, (v1Message, timeStampInMs) => {
-         var timeStampAsISOString = timeInMsToIsoString(timeStampInMs);
-         captureMessagesContainingPulsesGreaterThan30(v1Message, timeStampAsISOString);
-         removeOutliers(v1Message, timeStampAsISOString);
-         database.insert(v1Message, timeStampInMs);
-         oneMinAverage = calculateAverage(oneMinAverager);
-         historyOf2Hours.add(timeStampAsISOString, oneMinAverage);
+      provideEachV2MessageAsV1To(nowInMillis, v2Message, (v1Message, messageTimeStampInMs) => {
+         var messageTimeStampAsISOString = timeInMsToIsoString(messageTimeStampInMs);
+         captureMessagesContainingPulsesGreaterThan30(v1Message, messageTimeStampAsISOString);
+         removeOutliers(v1Message, messageTimeStampAsISOString);
+         database.insert(v1Message, messageTimeStampInMs);
+         oneMinAverage = calculateAverage(oneMinAverager, nowInMillis - messageTimeStampInMs);
+         historyOf2Hours.add(oneMinAverage, messageTimeStampAsISOString);
       });
    
       database.removeAllDocumentsOlderThan(TEN_MINUTES);
