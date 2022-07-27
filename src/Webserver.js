@@ -71,18 +71,29 @@ var sensorIdInRequestPathIsCorrect = function sensorIdInRequestPathIsCorrect(pat
 assertValidSensorId();
 assertValidSensorDirection();
 
-var express 	   = require('express');
-var bodyParser    = require('body-parser');
-var app 		      = express();
-var port		      = 80;
-var database 	   = new windsensor.database.InMemoryDatabase();
-var sensor		   = new windsensor.Windsensor(sensorId, sensorDirectionAsNumber, database);
+var express 	         = require('express');
+var bodyParser          = require('body-parser');
+var app 		            = express();
+var port		            = 80;
+var database 	         = new windsensor.database.InMemoryDatabase();
+var sensor		         = new windsensor.Windsensor(sensorId, sensorDirectionAsNumber, database);
+var textBodyParser      = bodyParser.text({ type: 'application/json' });
 
-app.use(bodyParser.json({ type: 'application/json' }));
+app.use(textBodyParser);
 
 app.post(/\/windsensor\/\d+/, (request, response) => {
-   var path             = request.path;
-   var message          = request.body;
+   var path = request.path;
+   var message;
+
+   try {
+      message = JSON.parse(request.body);
+   } catch(e) {
+      LOGGER.logError('failed to parse request body [path: ' + path + ']: ' + e.message);
+      LOGGER.logError('request content length: ' + request.get('Content-Length'));
+      LOGGER.logError('request body as text: ' + request.body);
+      response.status(400).send('syntax error in message');
+      return;
+   }
 
    LOGGER.logDebug('POST request [path: ' + path + ', body: ' + JSON.stringify(message) + ']');
 
