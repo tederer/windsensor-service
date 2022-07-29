@@ -7,11 +7,13 @@ require('./InputMessageValidator.js');
 
 var LOGGER = windsensor.logging.LoggingSystem.createLogger('Webserver');
 
-var configuredlogLevel		   = process.env.LOG_LEVEL;
-var sensorId				      = process.env.SENSOR_ID;
-var sensorDirection			   = process.env.SENSOR_DIRECTION;
-var sensorDirectionAsNumber	= Number.parseFloat(sensorDirection);
-var messageValidator          = new windsensor.InputMessageValidator();
+var configuredlogLevel           = process.env.LOG_LEVEL;
+var sensorId                     = process.env.SENSOR_ID;
+var sensorDirection              = process.env.SENSOR_DIRECTION;
+var sensorDirectionAsNumber      = Number.parseFloat(sensorDirection);
+var messageValidator             = new windsensor.InputMessageValidator();
+var malformedMessages            = [];
+var sequencedMalformedMessages   = [];
 
 var logLevel = windsensor.logging.Level.INFO;
 if (configuredlogLevel !== undefined && windsensor.logging.Level[configuredlogLevel] !== undefined) {
@@ -68,16 +70,31 @@ var sensorIdInRequestPathIsCorrect = function sensorIdInRequestPathIsCorrect(pat
     return (sensorIdInRequest !== undefined && sensorIdInRequest === sensorId);
 };
 
+var captureMalformedMessage = function captureMalformedMessage(message) {
+   var acceptMessage = false;
+   
+   sequencedMalformedMessages.push({timestamp: (new Date()).toISOString(), message: message.replace(/"/g, '\"')});
+   
+   if (sequencedMalformedMessages.length >= 3) {
+      malformedMessages.push(sequencedMalformedMessages);
+      malformedMessages           = malformedMessages.slice(-10);
+      sequencedMalformedMessages  = [];
+      acceptMessage               = true;
+   }
+
+   return acceptMessage;
+};
+
 assertValidSensorId();
 assertValidSensorDirection();
 
-var express 	         = require('express');
-var bodyParser          = require('body-parser');
-var app 		            = express();
-var port		            = 80;
-var database 	         = new windsensor.database.InMemoryDatabase();
-var sensor		         = new windsensor.Windsensor(sensorId, sensorDirectionAsNumber, database);
-var textBodyParser      = bodyParser.text({ type: 'application/json' });
+var express          = require('express');
+var bodyParser       = require('body-parser');
+var app              = express();
+var port             = 80;
+var database         = new windsensor.database.InMemoryDatabase();
+var sensor           = new windsensor.Windsensor(sensorId, sensorDirectionAsNumber, database);
+var textBodyParser   = bodyParser.text({ type: 'application/json' });
 
 app.use(textBodyParser);
 
@@ -85,13 +102,23 @@ app.post(/\/windsensor\/\d+/, (request, response) => {
    var path = request.path;
    var message;
 
+   console.log('sequencedMalformedMessages = ' + sequencedMalformedMessages.length);
+   console.log('malformedMessages          = ' + malformedMessages.length);
+   
    try {
       message = JSON.parse(request.body);
+      sequencedMalformedMessages = [];
    } catch(e) {
+      var acceptMalformedMessage = captureMalformedMessage(request.body);
       LOGGER.logError('failed to parse request body [path: ' + path + ']: ' + e.message);
       LOGGER.logError('request content length: ' + request.get('Content-Length'));
       LOGGER.logError('request body as text: ' + request.body);
-      response.status(400).send('syntax error in message');
+      if (acceptMalformedMessage) {
+         LOGGER.logInfo('accepted malformed message to avoid deadlock');
+         response.status(200).send('accepted malformed message to avoid deadlock');
+      } else {
+         response.status(400).send('syntax error in message');
+      }
       return;
    }
 
@@ -142,6 +169,7 @@ app.get(/\/info/, (request, response) => {
     info.messagesContainingOutliers             = sensor.getMessagesContainingOutliers();
     info.sensorErrors                           = sensor.getSensorErrors();
     info.messagesContainingPulsesGreaterThan30  = sensor.getMessagesContainingPulsesGreaterThan30();
+    info.malformedMessages                      = malformedMessages;
     response.status(200).json(info);
 });
 

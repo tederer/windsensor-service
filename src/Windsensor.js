@@ -191,7 +191,7 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionals) 
    var captureSensorErrors = function captureSensorErrors(message, nowAsIsoString) {
       if (message !== undefined && message.errors !== undefined && message.errors.length > 0) {
          capturedSensorErrors.push({timestamp: nowAsIsoString, errors: message.errors});
-         capturedSensorErrors = capturedSensorErrors.slice(-5);
+         capturedSensorErrors = capturedSensorErrors.slice(-10);
       }
    };
 
