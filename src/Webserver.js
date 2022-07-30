@@ -102,9 +102,6 @@ app.post(/\/windsensor\/\d+/, (request, response) => {
    var path = request.path;
    var message;
 
-   console.log('sequencedMalformedMessages = ' + sequencedMalformedMessages.length);
-   console.log('malformedMessages          = ' + malformedMessages.length);
-   
    try {
       message = JSON.parse(request.body);
       sequencedMalformedMessages = [];
