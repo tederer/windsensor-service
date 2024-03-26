@@ -1,19 +1,21 @@
 /* global windsensor, process */
 require('./logging/LoggingSystem.js');
 require('./database/InMemoryDatabase.js');
+require('./database/AzureCosmosDb.js');
 require('./Windsensor.js');
 require('./Version.js');
 require('./InputMessageValidator.js');
 
 var LOGGER = windsensor.logging.LoggingSystem.createLogger('Webserver');
 
-var configuredlogLevel           = process.env.LOG_LEVEL;
-var sensorId                     = process.env.SENSOR_ID;
-var sensorDirection              = process.env.SENSOR_DIRECTION;
-var sensorDirectionAsNumber      = Number.parseFloat(sensorDirection);
-var messageValidator             = new windsensor.InputMessageValidator();
-var malformedMessages            = [];
-var sequencedMalformedMessages   = [];
+var configuredlogLevel            = process.env.LOG_LEVEL;
+var sensorId                      = process.env.SENSOR_ID;
+var sensorDirection               = process.env.SENSOR_DIRECTION;
+var azureCosmosDbConnectionString = process.env.AZURE_COSMOS_DB_CONNECTION_STRING;
+var sensorDirectionAsNumber       = Number.parseFloat(sensorDirection);
+var messageValidator              = new windsensor.InputMessageValidator();
+var malformedMessages             = [];
+var sequencedMalformedMessages    = [];
 
 var logLevel = windsensor.logging.Level.INFO;
 if (configuredlogLevel !== undefined && windsensor.logging.Level[configuredlogLevel] !== undefined) {
@@ -71,18 +73,17 @@ var sensorIdInRequestPathIsCorrect = function sensorIdInRequestPathIsCorrect(pat
 };
 
 var captureMalformedMessage = function captureMalformedMessage(message) {
-   var acceptMessage = false;
-   
-   sequencedMalformedMessages.push({timestamp: (new Date()).toISOString(), message: message.replace(/"/g, '\"')});
-   
-   if (sequencedMalformedMessages.length >= 3) {
-      malformedMessages.push(sequencedMalformedMessages);
-      malformedMessages           = malformedMessages.slice(-10);
-      sequencedMalformedMessages  = [];
-      acceptMessage               = true;
-   }
+    var acceptMessage = false;
+    sequencedMalformedMessages.push({timestamp: (new Date()).toISOString(), message: message.replace(/"/g, '\"')});
+    
+    if (sequencedMalformedMessages.length >= 3) {
+        malformedMessages.push(sequencedMalformedMessages);
+        malformedMessages           = malformedMessages.slice(-10);
+        sequencedMalformedMessages  = [];
+        acceptMessage               = true;
+    }
 
-   return acceptMessage;
+    return acceptMessage;
 };
 
 assertValidSensorId();
@@ -92,50 +93,56 @@ var express          = require('express');
 var bodyParser       = require('body-parser');
 var app              = express();
 var port             = 80;
-var database         = new windsensor.database.InMemoryDatabase();
+var database;
+if (azureCosmosDbConnectionString === undefined) {
+    database = new windsensor.database.InMemoryDatabase();
+} else {
+    LOGGER.logInfo('creating Azure Cosmos DB instance ...');
+    database = new windsensor.database.AzureCosmosDb(azureCosmosDbConnectionString);
+}
 var sensor           = new windsensor.Windsensor(sensorId, sensorDirectionAsNumber, database);
 var textBodyParser   = bodyParser.text({ type: 'application/json' });
 
 app.use(textBodyParser);
 
 app.post(/\/windsensor\/\d+/, (request, response) => {
-   var path = request.path;
-   var message;
+    var path = request.path;
+    var message;
 
-   try {
-      message = JSON.parse(request.body);
-      sequencedMalformedMessages = [];
-   } catch(e) {
-      var acceptMalformedMessage = captureMalformedMessage(request.body);
-      LOGGER.logError('failed to parse request body [path: ' + path + ']: ' + e.message);
-      LOGGER.logError('request content length: ' + request.get('Content-Length'));
-      LOGGER.logError('request body as text: ' + request.body);
-      if (acceptMalformedMessage) {
-         LOGGER.logInfo('accepted malformed message to avoid deadlock');
-         response.status(200).send('accepted malformed message to avoid deadlock');
-      } else {
-         response.status(400).send('syntax error in message');
-      }
-      return;
-   }
+    try {
+        message = JSON.parse(request.body);
+        sequencedMalformedMessages = [];
+    } catch(e) {
+        var acceptMalformedMessage = captureMalformedMessage(request.body);
+        LOGGER.logError('failed to parse request body [path: ' + path + ']: ' + e.message);
+        LOGGER.logError('request content length: ' + request.get('Content-Length'));
+        LOGGER.logError('request body as text: ' + request.body);
+        if (acceptMalformedMessage) {
+            LOGGER.logInfo('accepted malformed message to avoid deadlock');
+            response.status(200).send('accepted malformed message to avoid deadlock');
+        } else {
+            response.status(400).send('syntax error in message');
+        }
+        return;
+    }
 
-   LOGGER.logDebug('POST request [path: ' + path + ', body: ' + JSON.stringify(message) + ']');
+    LOGGER.logDebug('POST request [path: ' + path + ', body: ' + JSON.stringify(message) + ']');
 
-   var isValidV1Message = messageValidator.isValidV1Message(message);
-   var isValidV2Message = messageValidator.isValidV2Message(message);
-   var isValidMessage   = isValidV1Message || isValidV2Message;
+    var isValidV1Message = messageValidator.isValidV1Message(message);
+    var isValidV2Message = messageValidator.isValidV2Message(message);
+    var isValidMessage   = isValidV1Message || isValidV2Message;
 
-   if (sensorIdInRequestPathIsCorrect(path) && isValidMessage) {
-      response.status(200).send('accepted');
-      sensor.processMessage(message);
-   } else {
-      if (!isValidMessage) {
-         LOGGER.logError('ignoring invalid message: ' + JSON.stringify(message));
-      } else {
-         LOGGER.logError('ignoring message for other sensor (path=' + path + '): ' + JSON.stringify(message));
-      }
-      response.status(400).send('invalid request/message');
-   }
+    if (sensorIdInRequestPathIsCorrect(path) && isValidMessage) {
+        response.status(200).send('accepted');
+        sensor.processMessage(message);
+    } else {
+        if (!isValidMessage) {
+            LOGGER.logError('ignoring invalid message: ' + JSON.stringify(message));
+        } else {
+            LOGGER.logError('ignoring message for other sensor (path=' + path + '): ' + JSON.stringify(message));
+        }
+        response.status(400).send('invalid request/message');
+    }
 });
 
 app.get(/\/windsensor\/\d+/, (request, response) => {
