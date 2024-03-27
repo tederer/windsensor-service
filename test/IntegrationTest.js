@@ -11,6 +11,19 @@ var sensor;
 var utils = new testing.Utils();
 var mockedDatabase;
 var message;
+var mockedPersistedState = {
+   read: async function read(stateId) {
+      return new Promise((resolve, reject) => {
+         resolve(undefined);
+      });
+   },
+
+   write: async function write(stateId, state) { 
+      return new Promise((resolve, reject) => {
+         resolve(200);
+      });
+   }
+};
 
 var MockedDatabase = function MockedDatabase() {
    var documents = [];
@@ -30,7 +43,7 @@ var MockedDatabase = function MockedDatabase() {
 MockedDatabase.prototype = new windsensor.database.Database();
 
 var givenAWindsensor = function givenAWindsensor() {
-   sensor = new windsensor.Windsensor(SENSOR_ID, SENSOR_DIRECTION, mockedDatabase);
+   sensor = new windsensor.Windsensor(SENSOR_ID, SENSOR_DIRECTION, mockedDatabase, mockedPersistedState);
 };
 
 var givenMessageGetsProcessed = function givenMessageGetsProcessed() {

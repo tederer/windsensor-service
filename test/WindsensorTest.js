@@ -39,6 +39,19 @@ var dataOfLast2Hours;
 var timestamps;
 var timestampIndex;
 var mockedAverageInstanceId = 1;
+var mockedPersistedState = {
+   read: async function read(stateId) {
+      return new Promise((resolve, reject) => {
+         resolve(undefined);
+      });
+   },
+
+   write: async function write(stateId, state) { 
+      return new Promise((resolve, reject) => {
+         resolve(200);
+      });
+   }
+};
 
 var degrees = function degrees(value) {
    return value;
@@ -91,7 +104,7 @@ var givenAWindsensor = function givenAWindsensor(optionalId) {
       averagerFactory:  testingAveragerFactory, 
       timeSource:       testingTimeSource
    };
-   sensor = new windsensor.Windsensor(sensorId, direction, testingDatabase, optionals);
+   sensor = new windsensor.Windsensor(sensorId, direction, testingDatabase, mockedPersistedState, optionals);
 };
 
 var givenAWindsensorWithADirection = function givenAWindsensorWithADirection(directionToUse) {

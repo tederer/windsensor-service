@@ -1,7 +1,7 @@
 /* global windsensor, process */
 require('./logging/LoggingSystem.js');
 require('./database/InMemoryDatabase.js');
-require('./database/AzureCosmosDb.js');
+require('./PersistedState.js');
 require('./Windsensor.js');
 require('./Version.js');
 require('./InputMessageValidator.js');
@@ -11,7 +11,6 @@ var LOGGER = windsensor.logging.LoggingSystem.createLogger('Webserver');
 var configuredlogLevel            = process.env.LOG_LEVEL;
 var sensorId                      = process.env.SENSOR_ID;
 var sensorDirection               = process.env.SENSOR_DIRECTION;
-var azureCosmosDbConnectionString = process.env.AZURE_COSMOS_DB_CONNECTION_STRING;
 var sensorDirectionAsNumber       = Number.parseFloat(sensorDirection);
 var messageValidator              = new windsensor.InputMessageValidator();
 var malformedMessages             = [];
@@ -93,14 +92,9 @@ var express          = require('express');
 var bodyParser       = require('body-parser');
 var app              = express();
 var port             = 80;
-var database;
-if (azureCosmosDbConnectionString === undefined) {
-    database = new windsensor.database.InMemoryDatabase();
-} else {
-    LOGGER.logInfo('creating Azure Cosmos DB instance ...');
-    database = new windsensor.database.AzureCosmosDb(azureCosmosDbConnectionString);
-}
-var sensor           = new windsensor.Windsensor(sensorId, sensorDirectionAsNumber, database);
+var persistedState   = new windsensor.PersistedState();
+var database         = new windsensor.database.InMemoryDatabase(persistedState);
+var sensor           = new windsensor.Windsensor(sensorId, sensorDirectionAsNumber, database, persistedState);
 var textBodyParser   = bodyParser.text({ type: 'application/json' });
 
 app.use(textBodyParser);

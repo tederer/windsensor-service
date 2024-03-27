@@ -9,6 +9,19 @@ var DEFAULT_TIMESTAMP = 0;
 var wrappedDocuments;
 var documents;
 var timestamps;
+var mockedPersistedState = {
+   read: async function read(stateId) {
+      return new Promise((resolve, reject) => {
+         resolve(undefined);
+      });
+   },
+
+   write: async function write(stateId, state) { 
+      return new Promise((resolve, reject) => {
+         resolve(200);
+      });
+   }
+};
 
 var testingTimeSource = function testingTimeSource() {
    var timestamp = DEFAULT_TIMESTAMP;
@@ -34,7 +47,7 @@ var setup = function setup() {
    wrappedDocuments = undefined;
    documents = undefined;
    timestamps = undefined;
-	database = new windsensor.database.InMemoryDatabase(testingTimeSource);
+	database = new windsensor.database.InMemoryDatabase(mockedPersistedState, testingTimeSource);
 };
 
 describe('InMemoryDatabase', function() {

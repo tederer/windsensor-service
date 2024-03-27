@@ -6,9 +6,10 @@ require('../logging/LoggingSystem.js');
 
 assertNamespace('windsensor.database');
 
-windsensor.database.InMemoryDatabase = function InMemoryDatabase(optionalTimeSource) {
+windsensor.database.InMemoryDatabase = function InMemoryDatabase(persistedState, optionalTimeSource) {
 	
-	var LOGGER = windsensor.logging.LoggingSystem.createLogger('InMemoryDatabase');
+	const LOGGER   = windsensor.logging.LoggingSystem.createLogger('InMemoryDatabase');
+	const STATE_ID = 'inMemoryDB';
 
 	var getNowInMillis = optionalTimeSource === undefined ? Date.now : optionalTimeSource;
 	var documents = [];
@@ -24,6 +25,8 @@ windsensor.database.InMemoryDatabase = function InMemoryDatabase(optionalTimeSou
 		LOGGER.logDebug(() => 'inserting ' + JSON.stringify(document) + optionalTimestampForLogging);
       var timestamp = (optionalTimestamp === undefined) ? getNowInMillis() : optionalTimestamp;
 		documents.push({timestamp: timestamp, document: document});
+		persistedState.write(STATE_ID, documents)
+			.catch(error => LOGGER.logError('failed to persist state: ' + error));
 	};
 
 	this.getAllDocumentsNotOlderThan = function getAllDocumentsNotOlderThan(maxAgeInMillis) {
@@ -37,6 +40,13 @@ windsensor.database.InMemoryDatabase = function InMemoryDatabase(optionalTimeSou
 		var index = getIndexOfOldestDocumentNotOlderThan(maxAgeInMillis);
 		documents = (index === -1) ? [] : documents.slice(index, documents.length);	
 	};
+
+	persistedState.read(STATE_ID)
+		.then(state => {
+			documents = state ?? [];
+			LOGGER.logInfo('restored InMemoryDatabase state containing ' + documents.length + ' entries');
+		})
+		.catch(error => LOGGER.logError('failed to restore state: ' + error));
 };
 
 windsensor.database.InMemoryDatabase.prototype = new windsensor.database.Database();

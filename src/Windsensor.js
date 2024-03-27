@@ -10,10 +10,11 @@ assertNamespace('windsensor');
  * id                                   String                           ID of the windsensor (format = [1-9][0-9]{5})
  * direction                            Number                           the direction (in degrees) of the sensor that should be used when the sensor reports 0°.
  * database                             windsensor.database.Database     the database that should get used to store the data
+ * persistedState                       windsensor.PersistedState        an instance to persist states in an external database
  * optionals.averagerFactory            windsensor.averaging.Factory     a factory supplying Averagers - required for testing   
  * optionals.timeSource                 Number                           a function returning the current time in ms since epoch
  */
-windsensor.Windsensor = function Windsensor(id, direction, database, optionals) {
+windsensor.Windsensor = function Windsensor(id, direction, database, persistedState, optionals) {
    
    var LOGGER          = windsensor.logging.LoggingSystem.createLogger('Windsensor[' + id + ']');
    var MESSAGE_VERSION = '1.0.0';
@@ -33,6 +34,8 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionals) 
    };
 
    var TwoHourHistory = function TwoHourHistory() {
+      const STATE_ID = 'twoHourHistory';
+
       var dataOfLast2Hours = [];
 
       var createDataForHistory = function createDataForHistory(timestamp, oneMinAverage) {
@@ -65,6 +68,8 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionals) 
       this.add = function add(oneMinAverage, nowAsIsoString) {
          dataOfLast2Hours.push(createDataForHistory(nowAsIsoString, oneMinAverage));
          removeDataOlderThan2Hours(nowAsIsoString);
+         persistedState.write(STATE_ID, dataOfLast2Hours)
+			   .catch(error => LOGGER.logError('failed to persist state of 2h history: ' + error));
       };
 
       this.get = function get() {
@@ -72,6 +77,14 @@ windsensor.Windsensor = function Windsensor(id, direction, database, optionals) 
          removeDataOlderThan2Hours(nowAsIsoString);
          return dataOfLast2Hours;
       };
+
+      
+      persistedState.read(STATE_ID)
+         .then(state => {
+            dataOfLast2Hours = state ?? [];
+            LOGGER.logInfo('restored 2h history state containing ' + dataOfLast2Hours.length + ' entries');
+         })
+         .catch(error => LOGGER.logError('failed to restore state: ' + error));
    };
 
    var historyOf2Hours = new TwoHourHistory();
