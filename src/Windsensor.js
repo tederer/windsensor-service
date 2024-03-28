@@ -66,10 +66,17 @@ windsensor.Windsensor = function Windsensor(id, direction, database, persistedSt
       };
       
       this.add = function add(oneMinAverage, nowAsIsoString) {
-         dataOfLast2Hours.push(createDataForHistory(nowAsIsoString, oneMinAverage));
-         removeDataOlderThan2Hours(nowAsIsoString);
-         persistedState.write(STATE_ID, dataOfLast2Hours)
-			   .catch(error => LOGGER.logError('failed to persist state of 2h history: ' + error));
+         var timestampOfRecordToAdd  = (new Date(nowAsIsoString)).getTime();
+         var timestampOfNewestRecord = 0;
+         if (dataOfLast2Hours.length > 0) {
+            timestampOfNewestRecord = (new Date(dataOfLast2Hours[dataOfLast2Hours.length - 1].timestamp)).getTime();
+         }
+         if (timestampOfRecordToAdd > timestampOfNewestRecord) {
+            dataOfLast2Hours.push(createDataForHistory(nowAsIsoString, oneMinAverage));
+            removeDataOlderThan2Hours(nowAsIsoString);
+            persistedState.write(STATE_ID, dataOfLast2Hours)
+               .catch(error => LOGGER.logError('failed to persist state of 2h history: ' + error));
+         }
       };
 
       this.get = function get() {

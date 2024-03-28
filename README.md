@@ -169,11 +169,14 @@ For a successful execution of the service you need to set the environment variab
 
 The table below describes all supported environment variables.
 
-|variable        |mandatory|type   |description|
-|----------------|---------|-------|-----------|
-|SENSOR_ID       |yes      |integer|The ID of the sensor (range: 1 - 99999)|
-|SENSOR_DIRECTION|no       |float  |The direction (in degrees) of the sensor that should be used when the sensor reports 0°.|
-|LOG_LEVEL       |no       |string |one of [DEBUG,INFO,WARNING,ERROR,OFF]|
+|variable                         |mandatory|type   |description|
+|---------------------------------|---------|-------|-----------|
+|SENSOR_ID                        |yes      |integer|The ID of the sensor (range: 1 - 99999)|
+|SENSOR_DIRECTION                 |no       |float  |The direction (in degrees) of the sensor that should be used when the sensor reports 0°.|
+|LOG_LEVEL                        |no       |string |one of [DEBUG,INFO,WARNING,ERROR,OFF]|
+|AZURE_COSMOS_DB_CONNECTION_STRING|no       |string |connection string of an Azure Cosmos DB for persisting the state|
+
+Using an Azure Cosmos DB is optional. If you do not specifiy the environment variable AZURE_COSMOS_DB_CONNECTION_STRING, states will not get persisted and a restart of the service resets the state.
 
 ## executing the tests
 
