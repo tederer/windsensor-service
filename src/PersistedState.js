@@ -18,6 +18,7 @@ windsensor.PersistedState = function PersistedState() {
     const LOGGER           = windsensor.logging.LoggingSystem.createLogger('PersistedState');
     
     var container;
+    var writeMutex = {};
 
     if (useDatabase) {
         LOGGER.logInfo('using Azure Cosmos DB');
@@ -61,19 +62,26 @@ windsensor.PersistedState = function PersistedState() {
      */
     this.write = async function write(stateId, state) { 
         return new Promise((resolve, reject) => {
-            if (!useDatabase) {
+            if (!useDatabase || (writeMutex[stateId] !== undefined)) {
                 resolve(200);
                 return;
             }
+            
+            writeMutex[stateId] = true;
+
             container.items.upsert({id: stateId, state: state})
                 .then(response => {
+                    writeMutex[stateId] = undefined;
                     if (isOk(response.statusCode)) {
                         resolve(response.statusCode);
                     } else {
                         reject('failed to write state (id=' + stateId + '): ' + response.statusCode);
                     }
                 })
-                .catch(reject);
+                .catch(error => {
+                    writeMutex[stateId] = undefined;
+                    reject(error);
+                });
             });
     };
 };
